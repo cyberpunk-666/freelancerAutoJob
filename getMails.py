@@ -3,46 +3,70 @@ from email import parser
 import re
 from urllib.parse import unquote
 import html
+from bs4 import BeautifulSoup
+import requests
 
-# Your Hotmail credentials
-username = 'fantasiiio@hotmail.com'
-password = 'tdk2hDDDD!'
+# Constants for credentials and server settings
+USERNAME = 'fantasiiio@hotmail.com'
+PASSWORD = 'tdk2hDDDD!'
+POP3_SERVER = 'outlook.office365.com'
+POP3_PORT = 995
+NUM_MESSAGES_TO_READ = 10
+TARGET_SENDER = '<noreply@notifications.freelancer.com>'
+JOB_LINK_PREFIX = 'https://www.freelancer.com/projects/python'
+JOB_DESCRIPTION_CLASSES = ['ProjectViewDetails','ng-star-inserted']
 
-# Connect to the Hotmail POP3 server
-pop3_server = 'outlook.office365.com'
-pop3_port = 995
+def connect_to_mailbox(username, password, server, port):
+    mailbox = poplib.POP3_SSL(server, port)
+    mailbox.user(username)
+    mailbox.pass_(password)
+    return mailbox
 
-# Connect to the server
-mailbox = poplib.POP3_SSL(pop3_server, pop3_port)
-mailbox.user(username)
-mailbox.pass_(password)
 
-# Get the number of messages
-num_messages = len(mailbox.list()[1])
+def fetch_job_description(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    selector = '.' + '.'.join(JOB_DESCRIPTION_CLASSES)
+    job_description = soup.select_one(selector)
+    if job_description:
+        return job_description.text
+    else:
+        return None
 
-# Read the last 10 messages or fewer if less than 10 messages
-num_messages_to_read = min(10, num_messages)
-for i in range(num_messages - num_messages_to_read + 1, num_messages + 1):
-    response, lines, octets = mailbox.retr(i)
-    msg_content = b'\r\n'.join(lines).decode('utf-8')
-    message = parser.Parser().parsestr(msg_content)
-    
-    if '<noreply@notifications.freelancer.com>' in message['from']:        # Extract links from the email message payload
+def extract_links_from_body(body):
+    pattern = r'originalsrc="([^"]+)"'
+    links = re.findall(pattern, body)
+    decoded_links = [html.unescape(unquote(link)) for link in links]
+    return decoded_links
+
+def process_message(message):
+    if TARGET_SENDER in message['from']:
         payload = message.get_payload()
         if isinstance(payload, list):
             for part in payload:
                 body = part.get_payload(decode=True).decode('utf-8')
-                # Regex pattern to find text between <a href="...">
-                pattern = r'originalsrc="([^"]+)"'
-                if links := re.findall(pattern, body):
-                    # Print the subject, sender, and extracted links
+                links = extract_links_from_body(body)
+                if links:
                     print('Subject:', message['subject'])
                     print('From:', message['from'])
-                    decoded_links = [html.unescape(unquote(link)) for link in links]
-                    for link in decoded_links:
-                        if link.startswith('https://www.freelancer.com/projects/python'):
-                            print(link)
+                    for link in links:
+                        if link.startswith(JOB_LINK_PREFIX):
+                            job_description = fetch_job_description(link)
+                            if job_description is not None:
+                                print(job_description)
 
+def main():
+    mailbox = connect_to_mailbox(USERNAME, PASSWORD, POP3_SERVER, POP3_PORT)
+    num_messages = len(mailbox.list()[1])
+    num_messages_to_read = min(NUM_MESSAGES_TO_READ, num_messages)
 
-# Close the connection
-mailbox.quit()
+    for i in range(num_messages - num_messages_to_read + 1, num_messages + 1):
+        response, lines, octets = mailbox.retr(i)
+        msg_content = b'\r\n'.join(lines).decode('utf-8')
+        message = parser.Parser().parsestr(msg_content)
+        process_message(message)
+    
+    mailbox.quit()
+
+if __name__ == '__main__':
+    main()
