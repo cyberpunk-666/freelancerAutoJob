@@ -14,7 +14,7 @@ POP3_PORT = 995
 NUM_MESSAGES_TO_READ = 10
 TARGET_SENDER = '<noreply@notifications.freelancer.com>'
 JOB_LINK_PREFIX = 'https://www.freelancer.com/projects/python'
-JOB_DESCRIPTION_CLASSES = ['ProjectViewDetails','ng-star-inserted']
+JOB_DESCRIPTION_CLASSES = ['ng-star-inserted']  # Example classes
 
 def connect_to_mailbox(username, password, server, port):
     mailbox = poplib.POP3_SSL(server, port)
@@ -25,11 +25,21 @@ def connect_to_mailbox(username, password, server, port):
 
 def fetch_job_description(url):
     response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    selector = '.' + '.'.join(JOB_DESCRIPTION_CLASSES)
-    job_description = soup.select_one(selector)
+    decoded_string = html.unescape(response.text)
+    soup = BeautifulSoup(decoded_string, 'html.parser')
+    
+    # Function to check if an element has all specified classes
+    def has_all_classes(tag):
+        classes = set(tag.get('class', []))
+        if classes:
+            print(classes)
+        return all(cls in classes for cls in JOB_DESCRIPTION_CLASSES)
+    
+    # Find the element using the function
+    job_description = soup.find(has_all_classes, 'div')
+    
     if job_description:
-        return job_description.text
+        return job_description.text.strip()  # Use .strip() to remove leading/trailing whitespace
     else:
         return None
 
@@ -61,12 +71,14 @@ def main():
     num_messages_to_read = min(NUM_MESSAGES_TO_READ, num_messages)
 
     for i in range(num_messages - num_messages_to_read + 1, num_messages + 1):
-        response, lines, octets = mailbox.retr(i)
+        retr_result = mailbox.retr(i)
+        response, lines, octets = retr_result
         msg_content = b'\r\n'.join(lines).decode('utf-8')
         message = parser.Parser().parsestr(msg_content)
         process_message(message)
     
     mailbox.quit()
+
 
 if __name__ == '__main__':
     main()
