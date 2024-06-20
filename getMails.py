@@ -1,4 +1,5 @@
 import poplib
+poplib._MAXLINE = 200480
 from email import parser
 import re
 from urllib.parse import unquote
@@ -23,31 +24,29 @@ def connect_to_mailbox(username, password, server, port):
     return mailbox
 
 
-def fetch_job_description(url):
-    response = requests.get(url)
-    decoded_string = html.unescape(response.text)
-    soup = BeautifulSoup(decoded_string, 'html.parser')
-    
-    # Function to check if an element has all specified classes
-    def has_all_classes(tag):
-        classes = set(tag.get('class', []))
-        if classes:
-            print(classes)
-        return all(cls in classes for cls in JOB_DESCRIPTION_CLASSES)
-    
-    # Find the element using the function
-    job_description = soup.find(has_all_classes, 'div')
-    
-    if job_description:
-        return job_description.text.strip()  # Use .strip() to remove leading/trailing whitespace
-    else:
-        return None
+def extract_job_description(soup):
+    div_element = soup.find('div', {'data-line-break': 'true'})
+    if div_element:
+        return div_element.text.strip()
+    return None
+
+def extract_job_title(soup):
+    title =  soup.title
+    if title:
+        return title.text.strip()
+    return None
 
 def extract_links_from_body(body):
     pattern = r'originalsrc="([^"]+)"'
     links = re.findall(pattern, body)
     decoded_links = [html.unescape(unquote(link)) for link in links]
     return decoded_links
+
+def extract_budget(soup):
+    budget = soup.find(attrs={'data-size': 'mid'})
+    if budget:
+        return budget.text.strip()
+    return None
 
 def process_message(message):
     if TARGET_SENDER in message['from']:
@@ -57,13 +56,18 @@ def process_message(message):
                 body = part.get_payload(decode=True).decode('utf-8')
                 links = extract_links_from_body(body)
                 if links:
-                    print('Subject:', message['subject'])
-                    print('From:', message['from'])
                     for link in links:
                         if link.startswith(JOB_LINK_PREFIX):
-                            job_description = fetch_job_description(link)
+                            response = requests.get(link)
+                            soup = BeautifulSoup(response.text, 'html.parser')                                                    
+                            job_description = extract_job_description(soup)
+                            job_title = extract_job_title(soup)
+                            job_budget = extract_budget(soup)
                             if job_description is not None:
-                                print(job_description)
+                                print('Job title:', job_title)
+                                print('budget: ',job_budget)
+                                print('description: ',job_description)
+                                print('-------------------------')
 
 def main():
     mailbox = connect_to_mailbox(USERNAME, PASSWORD, POP3_SERVER, POP3_PORT)
