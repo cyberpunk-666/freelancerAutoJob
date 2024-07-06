@@ -73,7 +73,6 @@ def main():
     mailbox = connect_to_mailbox(USERNAME, PASSWORD, POP3_SERVER, POP3_PORT)
     num_messages = len(mailbox.list()[1])
     num_messages_to_read = min(NUM_MESSAGES_TO_READ, num_messages)
-
     for i in range(num_messages - num_messages_to_read + 1, num_messages + 1):
         retr_result = mailbox.retr(i)
         response, lines, octets = retr_result

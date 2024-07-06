@@ -1,0 +1,142 @@
+With a rich history of 35 years in coding, which began when I was just 10 years old, I have cultivated a deep passion for technology and programming. My journey as a self-learner and DIY enthusiast has equipped me with a diverse skill set and an unyielding drive to explore and master various programming languages and technologies.
+
+Throughout my career, I have demonstrated my ability to adapt and excel in different programming environments. I am proficient in several programming languages, including Python, C++, C#.net, Visual Basic .net, HTML, JavaScript, ASP / ASP.net. My experience spans across various roles and projects, from web programming and enterprise solutions to 3D engine and gaming, technical support and 3D CAD drawing.
+
+I have recently worked on several exciting projects that highlight my capabilities and innovative approach:
+
+I have recently worked on several exciting projects that highlight my capabilities and innovative approach:
+
+-   **BattleGrid**: A Python 2D military turn-based strategy game that demonstrates my proficiency in game development and strategic planning.
+-   **Rocket Finder**: An Android software that receives wirelessly transmitted GPS locations, showcasing my skills in mobile application development and wireless communication technologies.
+-   **Genetic Algorithm**: Developed AI for cars and spaceships that learn to drive through different environments, utilizing advanced machine learning techniques.
+-   **Board Game AI**: Created an AI that plays as the second player in various board games and is difficult to beat, highlighting my expertise in AI development and game theory.
+-   **AI DocString Generator**: A Python software that communicates with different chatbots to generate docstrings for Python projects, demonstrating my ability to integrate AI and natural language processing into development tools.
+-   **Force Feedback RC Joystick**: Designed and implemented a force feedback RC joystick system, utilizing two Arduinos that communicate wirelessly. One Arduino, installed in the plane, transmits the force applied on a servo arm, which is measured using a small magnet reading the servo arm bending. The other Arduino, integrated into the joystick, transmits the joystick position, resulting in a responsive and immersive control experience.
+
+My previous boss once remarked that among the hundreds of programmers he has encountered, I stand out as one of the best. He described me as a "small talker, big doer" due to my tendency to initially view tasks as overwhelming and sometimes dismissing them as impossible, only to come up with innovative solutions the very next day.
+
+I take pride in my ability to solve complex mathematical and statistical problems in computing, develop robust applications using databases, and support users with their technical needs. My hands-on experience in both hardware and software installation, as well as network setup, underscores my comprehensive understanding of computer systems.
+
+What sets me apart is my determination to cross borders and venture into territories where others may hesitate to go. I am not constrained by language or technology barriers; instead, I see them as opportunities to expand my knowledge and capabilities. This approach has allowed me to succeed in numerous challenging projects and continuously push the boundaries of what is possible.
+
+
+### Professional Experience
+
+**2024**  
+**Programmer**  
+Dark Company  
+Chicoutimi
+
+**2022-2024**  
+**Programmer**  
+Dark Dev Studio  
+Chicoutimi
+
+**2013-2022**  
+**Programmer**  
+Code Certifié  
+Chicoutimi
+
+**2008-2013**  
+**Programmer**  
+Perséides Technologies  
+Chicoutimi
+
+**2007**  
+**Programmer**  
+Progitech GS Inc.  
+Chicoutimi
+
+**2006**  
+**Programmer / Analyst**  
+Étudiants Bien Branchés (CÉGEP)  
+Jonquière
+
+**2001-2003**  
+**3D Programmer**  
+Jeux Vidéo Saguenay  
+Jonquière
+
+**2001-2005**  
+**Harvester / Laborer**  
+Lozon & Sons Farms  
+Chatham, Ontario
+
+----------
+
+### Areas of Expertise
+
+-   Problem-solving in mathematical and statistical computing
+-   Proficient in structured programming languages
+    -   Python
+    -   C++
+    -   C#.net
+    -   Visual Basic .net
+    -   HTML
+    -   JavaScript
+    -   ASP / ASP.net
+    -   Assembly language
+-   Object-oriented programming (OOP)
+-   Database design with SQL / Access / MySQL
+-   SQL server configuration
+-   Application development using databases
+-   Program debugging
+-   Installation of hardware and software on workstations
+-   User support
+-   Script writing and editing
+-   Knowledge of editing software
+
+**Technical Support**
+
+-   In-home technical support
+-   Computer system cleaning
+-   Hardware / software installation
+-   Basic network installation
+
+**3D CAD Drawing Skills**
+
+-   Design and 3D modeling with CAD software
+-   Experience in creating 3D models for various applications
+
+----------
+
+### Language Skills
+
+-   Fluent in French
+-   Understanding of English
+
+----------
+
+### Education and Training
+
+**2006**  
+**Web Programming and Enterprise Solutions**  
+College Certificate (A.E.C.)  
+Programmer - Analyst  
+Collège Multihexa – Chicoutimi
+
+**2006**  
+**High School Diploma (D.E.S.)**  
+Centre de Formation Générale des Adultes (C.F.G.A)
+
+----------
+
+### Distinctive Strengths
+
+-   Enjoys challenges
+-   Interest in new technologies
+-   Extensive experience in software programming
+-   Good team player / works well independently
+-   Good manual dexterity, meticulous
+-   Experience in solving computing problems
+-   Perseverance in solving difficult problems
+
+----------
+
+### Miscellaneous Activities
+
+-   In-home computer repair
+-   Grand winner of Cyberomnium 2007 (Programming competition)
+-   2001-2003 Organized a video game project team
+-   Aeromodelling, building remote-controlled airplanes
+-   Electronic circuit assembly - soldering
