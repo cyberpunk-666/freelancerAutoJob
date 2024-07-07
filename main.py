@@ -8,14 +8,14 @@ def main():
     # Fetch jobs from email
     jobs = email_processor.fetch_jobs()
 
-    # Freelancer profile (this should be provided or loaded from a file)
-    freelancer_profile = """
-    - Experienced Python Developer with over 5 years of experience.
-    - Proficient in web scraping, data analysis, and automation.
-    - Strong background in web development using frameworks like Django and Flask.
-    - Excellent problem-solving skills and ability to work independently.
-    """
-    
+    # Freelancer profile
+    # Open the file in read mode
+    freelancer_profile = ""
+    with open('profile.txt', 'r') as file:
+    # Read the contents of the file into a string variable
+        freelancer_profile = file.read()
+    if freelancer_profile == "":
+        print("no profile found in profile.txt")
     # Initialize job application processor
     job_application_processor = JobApplicationProcessor()
     
