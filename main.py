@@ -1,7 +1,12 @@
 from email_processor import EmailProcessor
 from job_application_processor import JobApplicationProcessor
+import logging
 
 def main():
+    
+    # Configure logging
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
     # Initialize email processor
     email_processor = EmailProcessor()
 

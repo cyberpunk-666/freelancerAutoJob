@@ -4,9 +4,9 @@ from email import parser
 import re
 from urllib.parse import unquote
 import html
-from bs4 import BeautifulSoup
-import requests
 import configparser
+import logging
+import requests
 
 class EmailProcessor:
     def __init__(self, config_path='config.cfg'):
@@ -51,44 +51,63 @@ class EmailProcessor:
             return budget.text.strip()
         return None
 
+
+
     def process_message(self, message):
+        logging.info("Starting to process message")
+
         if self.target_sender in message['from']:
+            logging.debug(f"Message from target sender: {message['from']}")
             payload = message.get_payload()
+            
             if isinstance(payload, list):
+                logging.debug("Message payload is a list")
                 for part in payload:
                     body = part.get_payload(decode=True).decode('utf-8')
+                    logging.debug(f"Decoded message part: {body[:50]}...")  # Log first 50 characters
+
                     links = self.extract_links_from_body(body)
+                    logging.debug(f"Extracted links: {links}")
+
                     if links:
                         for link in links:
+                            logging.debug(f"Processing link: {link}")
                             if link.startswith(self.job_link_prefix):
                                 response = requests.get(link)
+                                logging.info(f"Requested link: {link}")
+
                                 soup = BeautifulSoup(response.text, 'html.parser')
                                 job_description = self.extract_job_description(soup)
                                 job_title = self.extract_job_title(soup)
                                 job_budget = self.extract_budget(soup)
+
                                 if job_description is not None:
+                                    logging.info(f"Job found: {job_title}, Budget: {job_budget}")
                                     return {
                                         'title': job_title,
                                         'description': job_description,
                                         'budget': job_budget,
                                         'link': link
                                     }
+        logging.warning("No valid job found in message")
         return None
 
-    def fetch_jobs(self):
-        self.connect_to_mailbox()
-        num_messages = len(self.mailbox.list()[1])
-        num_messages_to_read = min(self.num_messages_to_read, num_messages)
+    def fetch_jobs(self, job_queue):
+        logging.info("Fetching jobs from job queue")
+
+        if not job_queue:
+            logging.warning("Job queue is empty")
+            return []
+
         jobs = []
-
-        for i in range(num_messages - num_messages_to_read + 1, num_messages + 1):
-            retr_result = self.mailbox.retr(i)
-            response, lines, octets = retr_result
-            msg_content = b'\r\n'.join(lines).decode('utf-8')
-            message = parser.Parser().parsestr(msg_content)
-            job = self.process_message(message)
-            if job:
+        try:
+            for job in job_queue:
+                logging.debug(f"Fetching job: {job}")
                 jobs.append(job)
+            logging.info(f"Successfully fetched {len(jobs)} jobs")
+        except Exception as e:
+            logging.error(f"Error fetching jobs: {e}", exc_info=True)
+            return []
 
-        self.mailbox.quit()
         return jobs
+
