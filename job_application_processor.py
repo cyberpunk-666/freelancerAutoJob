@@ -16,19 +16,43 @@ class JobApplicationProcessor:
         self.logger = logging.getLogger(__name__)
 
     def parse_budget(self, budget_text):
-        try:
-            budget_range = budget_text.replace('$', '').strip().split('-')
-            min_budget = float(budget_range[0].strip())
-            max_budget = float(budget_range[1].strip()) if len(budget_range) > 1 else min_budget
-            return min_budget, max_budget
-        except ValueError:
-            self.logger.error(f"Failed to parse budget: {budget_text}")
-            return None, None
+        prompt = f"""
+        Budget: {budget_text}
 
-    def is_budget_acceptable(self, estimated_cost, min_budget, max_budget):
-        return min_budget <= estimated_cost <= max_budget
+        Please convert the budget to CAD, and determine if it is an hourly or fixed rate. Provide the response in the following JSON format:
 
-    def send_to_gpt(self, prompt, max_tokens=300, model="gpt-4"):
+        {{
+            "min_budget_cad": float,
+            "max_budget_cad": float,
+            "rate_type": "string (hourly or fixed)"
+        }}
+        """
+        
+        response_text = self.send_to_gpt(prompt)
+        self.logger.info(f'budget:{')
+        if response_text:
+            try:
+                return json.loads(response_text)
+            except json.JSONDecodeError:
+                self.logger.error(f"Failed to decode JSON response: {response_text}")
+                return None
+        return None
+
+    def is_budget_acceptable(self, assumption_and_time, budget_info):
+        estimated_time = float(assumption_and_time["estimated_time"])  # Time in hours
+        min_budget = budget_info["min_budget_cad"]
+        max_budget = budget_info["max_budget_cad"]
+        rate_type = budget_info["rate_type"]
+    
+        if rate_type == "hourly":
+            hourly_rate = float(budget_info["hourly_rate_cad"])
+            total_cost = estimated_time * hourly_rate
+        else:
+            total_cost = float(budget_info["fixed_rate_cad"])
+    
+        return min_budget <= total_cost <= max_budget
+    
+       def send_to_gpt(self, prompt, max_tokens=300, model="gpt-4"):
         try:
             messages = [
                 {"role": "system", "content": "You are an intelligent assistant."},
@@ -62,15 +86,14 @@ class JobApplicationProcessor:
         
         return self.send_to_gpt(prompt, max_tokens=500)
 
-    def estimate_cost_and_time(self, job_description):
+    def analyse_job_and_time(self, job_description):
         prompt = f"""
         Job Description: {job_description}
 
-        Analyze the tasks described in the job description. Provide an estimated cost and time to complete the tasks in the following JSON format:
+        Analyze the tasks described in the job description. Provide an estimated time to complete the tasks in the following JSON format:
 
         {{
-            "estimated_cost": "string (e.g., '$500')",
-            "estimated_time": "string (e.g., '2 weeks')",
+            "estimated_time": "string (e.g., '200 hours'')",
             "assumptions": "string (a brief explanation of assumptions and methodology)"
         }}
         """
@@ -78,6 +101,7 @@ class JobApplicationProcessor:
         response_text = self.send_to_gpt(prompt, max_tokens=300)
         if response_text:
             try:
+                self.logger.info(f'job and time:{response_text}')
                 return json.loads(response_text)
             except json.JSONDecodeError:
                 self.logger.error(f"Failed to decode JSON response: {response_text}")
@@ -115,8 +139,9 @@ class JobApplicationProcessor:
             self.logger.info(f"Processing job: {job_title}")
 
             # Parse budget
-            min_budget, max_budget = self.parse_budget(budget_text)
-            if min_budget is None or max_budget is None:
+            budget_info = self.parse_budget(budget_text)
+            if min_budget 
+            if budget_info is None:
                 self.logger.warning(f"Skipping job '{job_title}' due to missing or invalid budget information.")
                 continue
 
@@ -126,16 +151,14 @@ class JobApplicationProcessor:
                 self.logger.info(f"Skipping job '{job_title}' because it does not fit the freelancer's profile.")
                 continue
 
-            # Estimate cost and time
-            cost_and_time_estimate = self.estimate_cost_and_time(job_description)
-            if not cost_and_time_estimate:
-                self.logger.warning(f"Skipping job '{job_title}' due to failure in estimating cost and time.")
+            # Estimate time
+            assumption_and_time = self.analyse_job_and_time(job_description)
+            if not assumption_and_time:
+                self.logger.warning(f"Skipping job '{job_title}' due to failure in estimating job")
                 continue
 
-            estimated_cost = float(cost_and_time_estimate["estimated_cost"].replace('$', '').strip())
-
             # Check if budget is acceptable
-            if not self.is_budget_acceptable(estimated_cost, min_budget, max_budget):
+            if not self.is_budget_acceptable(assumption_and_time, budget_info):
                 self.logger.info(f"Skipping job '{job_title}' because the estimated cost is not within the budget range.")
                 continue
 

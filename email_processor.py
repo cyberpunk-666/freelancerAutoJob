@@ -26,6 +26,8 @@ class EmailProcessor:
         self.target_sender = self.config.get('GENERAL', 'TARGET_SENDER')
         self.job_link_prefix = self.config.get('GENERAL', 'JOB_LINK_PREFIX')
         self.job_description_classes = self.config.get('HTML_CLASSES', 'JOB_DESCRIPTION_CLASSES').split(',')
+        self.min_hourly_rate = self.config.get('GENERAL', 'MIN_HOURLY_RATE')
+        self.desired_hourly_rate = self.config.get('GENERAL', 'DESIRED_HOURLY_RATE')
         self.mailbox=None
     def connect_to_mailbox(self):
         logging.debug("Connecting to mailbox: %s:%d", self.pop3_server, self.pop3_port)

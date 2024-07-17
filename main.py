@@ -1,26 +1,64 @@
 from email_processor import EmailProcessor
 from job_application_processor import JobApplicationProcessor
 import logging
+import os
+import json
+from datetime import datetime
 
 def main():
     
-    # Configure logging
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+    # Directory for log files
+    log_directory = "log"
+    os.makedirs(log_directory, exist_ok=True)  # Create the directory if it doesn't exist
+    
+    # Create a log file with the current date as the filename
+    log_filename = os.path.join(log_directory, f"{datetime.now().strftime('%Y-%m-%d')}.log")
+    
+    # Configure the logger
+    logging.basicConfig(
+        level=logging.DEBUG,  # Minimum log level
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Log message format
+        datefmt='%Y-%m-%d %H:%M:%S',  # Date format
+        handlers=[
+            logging.FileHandler(log_filename),  # Log file
+            logging.StreamHandler()  # Console output
+        ]
+    )
 
-    # Initialize email processor
-    email_processor = EmailProcessor()
+    # Filename for saving jobs
+    jobs_filename = 'jobs.json'
 
-    # Fetch jobs from email
-    jobs = email_processor.fetch_jobs()
+    # Check if jobs file exists
+    if os.path.exists(jobs_filename):
+        with open(jobs_filename, 'r') as file:
+            jobs = json.load(file)
+        logging.info(f"Loaded jobs from {jobs_filename}")
+    else:
+        # Initialize email processor
+        email_processor = EmailProcessor()
+
+        # Fetch jobs from email
+        jobs = email_processor.fetch_jobs()
+
+        # Save jobs to a file for debugging purposes
+        with open(jobs_filename, 'w') as file:
+            json.dump(jobs, file)
+        logging.info(f"Saved jobs to {jobs_filename}")
 
     # Freelancer profile
-    # Open the file in read mode
     freelancer_profile = ""
-    with open('profile.txt', 'r') as file:
-    # Read the contents of the file into a string variable
-        freelancer_profile = file.read()
-    if freelancer_profile == "":
-        print("no profile found in profile.txt")
+    try:
+        with open('profile.txt', 'r') as file:
+            freelancer_profile = file.read()
+        if freelancer_profile == "":
+            logging.error("No profile found in profile.txt")
+            return
+        else:
+            logging.info("Profile found in profile.txt")
+    except FileNotFoundError:
+        logging.error("profile.txt not found")
+        return
+
     # Initialize job application processor
     job_application_processor = JobApplicationProcessor()
     
