@@ -1,4 +1,4 @@
-import openai
+from openai import OpenAI
 import json
 import configparser
 import logging
@@ -8,12 +8,47 @@ class JobApplicationProcessor:
     def __init__(self, config_path='config.cfg'):
         self.config = configparser.ConfigParser()
         self.config.read(config_path)
-        
-        openai.api_key = self.config.get('API', 'OPENAI_API_KEY')
-
+        openai_api_key = self.config.get('API', 'OPENAI_API_KEY')
         # Setup logging
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
+        self.client = OpenAI(
+            api_key = openai_api_key
+        )
+        self.cache = {}  # Initialize cache
+
+    def send_to_gpt(self, prompt, max_tokens=300, model="gpt-4"):
+        self.logger.info(f'sending prompt: {prompt}')
+        
+        # Check if response is cached
+        cache_key = (prompt, max_tokens, model)
+        if cache_key in self.cache:
+            self.logger.info(f'Using cached response for prompt: {prompt}')
+            return self.cache[cache_key]
+        
+        try:
+            messages = [
+                {"role": "system", "content": "You are an intelligent assistant."},
+                {"role": "user", "content": prompt}
+            ]
+
+            response = self.client.chat.completions.create(
+                messages=messages,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=0.7
+            )
+            response_str = response.choices[0].message["content"].strip()
+            self.logger.info(f'GPT answer: {response_str}')
+            
+            # Cache the response if it does not contain "ERROR"
+            if "ERROR" not in response_str:
+                self.cache[cache_key] = response_str
+            
+            return response_str
+        except Exception as e:
+            self.logger.error(f"Failed to get response from GPT-4: {str(e)}")
+            return None
 
     def parse_budget(self, budget_text):
         prompt = f"""
@@ -26,10 +61,8 @@ class JobApplicationProcessor:
             "max_budget_cad": float,
             "rate_type": "string (hourly or fixed)"
         }}
-        """
-        
+        """    
         response_text = self.send_to_gpt(prompt)
-        self.logger.info(f'budget:{')
         if response_text:
             try:
                 return json.loads(response_text)
@@ -49,28 +82,10 @@ class JobApplicationProcessor:
             total_cost = estimated_time * hourly_rate
         else:
             total_cost = float(budget_info["fixed_rate_cad"])
-    
+        
+        self.logger.info(f'total_cost: {total_cost}')
         return min_budget <= total_cost <= max_budget
     
-       def send_to_gpt(self, prompt, max_tokens=300, model="gpt-4"):
-        try:
-            messages = [
-                {"role": "system", "content": "You are an intelligent assistant."},
-                {"role": "user", "content": prompt}
-            ]
-
-            response = openai.ChatCompletion.create(
-                model=model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=0.7
-            )
-
-            return response.choices[0].message["content"].strip()
-        except Exception as e:
-            self.logger.error(f"Failed to get response from GPT-4: {str(e)}")
-            return None
-
     def generate_application_letter(self, job_description, freelancer_profile):
         prompt = f"""
         Job Description: {job_description}
@@ -140,7 +155,6 @@ class JobApplicationProcessor:
 
             # Parse budget
             budget_info = self.parse_budget(budget_text)
-            if min_budget 
             if budget_info is None:
                 self.logger.warning(f"Skipping job '{job_title}' due to missing or invalid budget information.")
                 continue
@@ -162,7 +176,7 @@ class JobApplicationProcessor:
                 self.logger.info(f"Skipping job '{job_title}' because the estimated cost is not within the budget range.")
                 continue
 
-            self.logger.info(f"Applying for job '{job_title}' with estimated cost {estimated_cost}")
+            self.logger.info(f"Applying for job '{job_title}' with estimated cost {assumption_and_time['estimated_cost']}")
             # Apply for job using Selenium
             # self.apply_for_job_with_selenium(driver, job_title, job_link)
 
