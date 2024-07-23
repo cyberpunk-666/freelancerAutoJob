@@ -2,53 +2,115 @@ from openai import OpenAI
 import json
 import configparser
 import logging
+import requests
+import re
 import os
+import hashlib
 
 class JobApplicationProcessor:
     def __init__(self, config_path='config.cfg'):
         self.config = configparser.ConfigParser()
         self.config.read(config_path)
-        openai_api_key = self.config.get('API', 'OPENAI_API_KEY')
+        self.api_key = self.config.get('API', 'OPENAI_API_KEY')
         # Setup logging
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
         self.client = OpenAI(
-            api_key = openai_api_key
+            api_key = self.api_key
         )
-        self.cache = {}  # Initialize cache
+        self.cache = self.load_cache()
 
-    def send_to_gpt(self, prompt, max_tokens=300, model="gpt-4"):
+    def load_cache(self):
+        if os.path.exists("cache.json"):
+            try:
+                with open("cache.json", 'r') as file:
+                    cache = json.load(file)
+                self.logger.info('Cache loaded from file')
+                return cache
+            except Exception as e:
+                self.logger.error(f'Failed to load cache from file: {str(e)}')
+        return {}
+
+    def save_cache(self):
+        try:
+            with open("cache.json",  'w') as file:
+                json.dump(self.cache, file)
+            self.logger.info('Cache saved to file')
+        except Exception as e:
+            self.logger.error(f'Failed to save cache to file: {str(e)}')
+
+    def extract_json_string(self, input_string):
+        self.logger.info('Starting extraction process')
+        
+        try:
+            self.logger.info('Attempting to find JSON string in the input')
+            # Use a stack to handle nested braces
+            stack = []
+            json_start = None
+
+            for i, char in enumerate(input_string):
+                if char == '{':
+                    if not stack:
+                        json_start = i
+                    stack.append(char)
+                elif char == '}':
+                    stack.pop()
+                    if not stack and json_start is not None:
+                        json_str = input_string[json_start:i + 1]
+                        self.logger.info(f'Found JSON string: {json_str}')
+                        
+                        # Load the found JSON string to verify its validity
+                        json_obj = json.loads(json_str)
+                        self.logger.info('JSON string is valid')
+                        return json.dumps(json_obj)  # Return the valid JSON string
+
+            self.logger.warning('No JSON string found in the input')
+            return None
+        except (json.JSONDecodeError, IndexError) as e:
+            self.logger.error(f'Error during extraction or validation: {str(e)}')
+            return None
+
+    def send_to_gpt(self, prompt, max_tokens=300, model="gpt-3.5-turbo"):
         self.logger.info(f'sending prompt: {prompt}')
         
-        # Check if response is cached
-        cache_key = (prompt, max_tokens, model)
+        # Create a unique cache key
+        cache_key = hashlib.md5(f'{prompt}{max_tokens}{model}'.encode()).hexdigest()
         if cache_key in self.cache:
             self.logger.info(f'Using cached response for prompt: {prompt}')
             return self.cache[cache_key]
         
         try:
-            messages = [
-                {"role": "system", "content": "You are an intelligent assistant."},
-                {"role": "user", "content": prompt}
-            ]
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {self.api_key}'
+            }
+            data = {
+                'model': model,
+                'messages': [
+                    {"role": "system", "content": "You are an intelligent assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                'max_tokens': max_tokens,
+                'temperature': 0.7
+            }
 
-            response = self.client.chat.completions.create(
-                messages=messages,
-                model=model,
-                max_tokens=max_tokens,
-                temperature=0.7
-            )
-            response_str = response.choices[0].message["content"].strip()
+            response = requests.post('https://api.aimlapi.com/chat/completions', headers=headers, json=data)
+            response.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
+            response_data = response.json()
+            
+            response_str = response_data['choices'][0]['message']['content'].strip()
             self.logger.info(f'GPT answer: {response_str}')
             
             # Cache the response if it does not contain "ERROR"
             if "ERROR" not in response_str:
                 self.cache[cache_key] = response_str
+                self.save_cache()
             
             return response_str
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             self.logger.error(f"Failed to get response from GPT-4: {str(e)}")
             return None
+
 
     def parse_budget(self, budget_text):
         prompt = f"""
@@ -61,30 +123,50 @@ class JobApplicationProcessor:
             "max_budget_cad": float,
             "rate_type": "string (hourly or fixed)"
         }}
-        """    
+        """
         response_text = self.send_to_gpt(prompt)
         if response_text:
             try:
-                return json.loads(response_text)
+                json_str = self.extract_json_string(response_text)
+                if not json_str:
+                    return None
+                return json.loads(json_str)
             except json.JSONDecodeError:
                 self.logger.error(f"Failed to decode JSON response: {response_text}")
                 return None
         return None
-
+        
+    def extract_first_number(self, input_string):
+        self.logger.info('Starting number extraction process')
+        
+        try:
+            self.logger.info('Attempting to find the first numeric value in the input')
+            # Use regular expression to find the first numeric value in the input string
+            match = re.search(r'\d+', input_string)
+            if match:
+                number = int(match.group())
+                self.logger.info(f'Found numeric value: {number}')
+                return number
+            else:
+                self.logger.warning('No numeric value found in the input')
+                return None
+        except Exception as e:
+            self.logger.error(f'Error during number extraction: {str(e)}')
+            return None
+            
     def is_budget_acceptable(self, assumption_and_time, budget_info):
-        estimated_time = float(assumption_and_time["estimated_time"])  # Time in hours
+        estimated_time = self.extract_first_number(assumption_and_time["estimated_time"])  # Time in hours
         min_budget = budget_info["min_budget_cad"]
         max_budget = budget_info["max_budget_cad"]
         rate_type = budget_info["rate_type"]
     
-        if rate_type == "hourly":
-            hourly_rate = float(budget_info["hourly_rate_cad"])
-            total_cost = estimated_time * hourly_rate
-        else:
-            total_cost = float(budget_info["fixed_rate_cad"])
+        hourly_rate = float(self.config.get('GENERAL', 'MIN_HOURLY_RATE'))
+        total_cost = estimated_time * hourly_rate
         
         self.logger.info(f'total_cost: {total_cost}')
-        return min_budget <= total_cost <= max_budget
+        is_acceptable = min_budget <= total_cost <= max_budget
+        self.logger.info(f"is acceptable:{is_acceptable}")
+        return is_acceptable
     
     def generate_application_letter(self, job_description, freelancer_profile):
         prompt = f"""
@@ -116,8 +198,10 @@ class JobApplicationProcessor:
         response_text = self.send_to_gpt(prompt, max_tokens=300)
         if response_text:
             try:
-                self.logger.info(f'job and time:{response_text}')
-                return json.loads(response_text)
+                json_str = self.extract_json_string(response_text)
+                if not json_str:
+                    return None
+                return json.loads(json_str)
             except json.JSONDecodeError:
                 self.logger.error(f"Failed to decode JSON response: {response_text}")
                 return None
@@ -139,7 +223,10 @@ class JobApplicationProcessor:
         response_text = self.send_to_gpt(prompt, max_tokens=300)
         if response_text:
             try:
-                return json.loads(response_text)
+                json_str = self.extract_json_string(response_text)
+                if not json_str:
+                    return None
+                return json.loads(json_str)
             except json.JSONDecodeError:
                 self.logger.error(f"Failed to decode JSON response: {response_text}")
                 return None
@@ -175,20 +262,10 @@ class JobApplicationProcessor:
             if not self.is_budget_acceptable(assumption_and_time, budget_info):
                 self.logger.info(f"Skipping job '{job_title}' because the estimated cost is not within the budget range.")
                 continue
-
-            self.logger.info(f"Applying for job '{job_title}' with estimated cost {assumption_and_time['estimated_cost']}")
+            estimated_time = self.extract_first_number(assumption_and_time['estimated_time'])
+            self.logger.info(f"Applying for job '{job_title}'")
+            self.logger.info(f"Estimated time: {estimated_time}")
+            self.logger.info(f"Assumptions: {assumption_and_time['assumptions']}")
+            
             # Apply for job using Selenium
             # self.apply_for_job_with_selenium(driver, job_title, job_link)
-
-# Usage example:
-# processor = JobApplicationProcessor()
-# jobs = [
-#     {
-#         "title": "Example Job 1",
-#         "description": "This is an example job description.",
-#         "budget": "$300-$500"
-#     },
-#     # Add more jobs as needed
-# ]
-# freelancer_profile = "This is a sample freelancer profile."
-# processor.process_jobs(jobs, freelancer_profile)
