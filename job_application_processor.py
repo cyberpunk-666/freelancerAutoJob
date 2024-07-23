@@ -6,6 +6,7 @@ import requests
 import re
 import os
 import hashlib
+from email_sender import EmailSender
 
 class JobApplicationProcessor:
     def __init__(self, config_path='config.cfg'):
@@ -19,6 +20,13 @@ class JobApplicationProcessor:
             api_key = self.api_key
         )
         self.cache = self.load_cache()
+        smtp_server = self.config.get('SMTP', 'SMTP_SERVER')
+        smtp_port = self.config.get('SMTP', 'SMTP_PORT')
+        self.smtp_recipient = self.config.get('SMTP', 'RECIPIENT')
+        username = self.config.get('EMAIL', 'USERNAME')
+        password = self.config.get('EMAIL', 'PASSWORD')
+
+        self.email_sender = EmailSender(smtp_server, smtp_port, username, password)
 
     def load_cache(self):
         if os.path.exists("cache.json"):
@@ -232,6 +240,39 @@ class JobApplicationProcessor:
                 return None
         return None
 
+    def send_job_details_email(self, job_title, job_description, estimated_time, assumptions, budget_text):
+        subject = f"New Job Found: {job_title}"
+        body = f"""
+        Job Title: {job_title}
+        Job Description: {job_description}
+        Budget: {budget_text}
+        Estimated Time: {estimated_time} hours
+        Assumptions: {assumptions}
+
+        This job fits the profile and the budget is acceptable.
+        """
+        recipient = self.config.get('SMTP', 'RECIPIENT')
+        
+        try:
+            self.email_sender.send_email(subject, body, recipient)
+            self.logger.info(f"Email sent to {recipient} with job details.")
+        except Exception as e:
+            self.logger.error(f"Failed to send email: {str(e)}")
+
+    def send_email(self, job_title, job_description, estimated_time, assumptions, application_letter):
+        subject = f"Job Application for {job_title}"
+        body = f"""
+        Job Title: {job_title}
+        Job Description: {job_description}
+        
+        Estimated Time: {estimated_time}
+        Assumptions: {assumptions}
+        
+        Application Letter:
+        {application_letter}
+        """
+        self.email_sender.send_email(self.smtp_recipient, subject, body)
+
     def process_jobs(self, jobs, freelancer_profile):
         for job in jobs:
             job_title = job['title']
@@ -262,10 +303,19 @@ class JobApplicationProcessor:
             if not self.is_budget_acceptable(assumption_and_time, budget_info):
                 self.logger.info(f"Skipping job '{job_title}' because the estimated cost is not within the budget range.")
                 continue
+
             estimated_time = self.extract_first_number(assumption_and_time['estimated_time'])
             self.logger.info(f"Applying for job '{job_title}'")
             self.logger.info(f"Estimated time: {estimated_time}")
             self.logger.info(f"Assumptions: {assumption_and_time['assumptions']}")
-            
+
+            # Generate application letter
+            application_letter = self.generate_application_letter(job_description, freelancer_profile)
+            if application_letter:
+                self.send_email(job_title, job_description, estimated_time, assumption_and_time['assumptions'], application_letter)
+                self.logger.info(f"Email sent for job '{job_title}'")
+            else:
+                self.logger.error(f"Failed to generate application letter for job '{job_title}'")
+
             # Apply for job using Selenium
             # self.apply_for_job_with_selenium(driver, job_title, job_link)
