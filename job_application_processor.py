@@ -16,9 +16,8 @@ import time
 import os
 
 class JobApplicationProcessor:
-    def __init__(self, config_path=None):
-        if config_path is None:
-            config_path = os.path.join(os.path.dirname(__file__), 'config.cfg')
+    def __init__(self):
+        config_path = os.path.join(os.path.dirname(__file__), 'config.cfg')
         self.config = configparser.ConfigParser()
         self.config.read(config_path)
         self.api_key = self.config.get('API', 'OPENAI_API_KEY')

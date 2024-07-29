@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 from email_processor import EmailProcessor
 from job_application_processor import JobApplicationProcessor
+import configparser
 
 class FlushableStreamHandler(logging.StreamHandler):
     def emit(self, record):
@@ -48,15 +49,36 @@ def setup_logging(log_directory: str, max_length: int):
 
     return log_filename
 
+def str_to_bool(s: str) -> bool:
+    """
+    Convert a string to a boolean.
+    
+    Args:
+        s (str): The string to convert.
+        
+    Returns:
+        bool: The converted boolean value.
+    """
+    if s.lower() in ('true', 'yes', '1'):
+        return True
+    elif s.lower() in ('false', 'no', '0'):
+        return False
+    else:
+        raise ValueError(f"Cannot convert {s} to boolean")
 
 
 def main():
+    logger = logging.getLogger(__name__)  # Get a specific logger for this module
+    config_path = os.path.join(os.path.dirname(__file__), 'config.cfg')
+    config = configparser.ConfigParser()
+    logger.debug(f"config path:{config_path}")
+    config.read(config_path)
+
     # Directory for log files
     log_directory = "log"
     max_log_length = 500  # Specify the maximum length for log messages
     log_filename = setup_logging(log_directory, max_log_length)
     
-    logger = logging.getLogger(__name__)  # Get a specific logger for this module
     logger.debug(f"Log file created: {log_filename}")
 
     # Initialize email processor
@@ -70,8 +92,11 @@ def main():
     for job in jobs:
         logger.info(f"- {job['title']}")
 
+    wait_for_key = str_to_bool(config.get("GENERAL", "WAIT_AFTER_FETCHING_JOBS"))
+
     # Pause and wait for a key press
-    input("Press any key to continue...")
+    if wait_for_key:
+        input("Press any key to continue...")
 
     # Freelancer profile
     freelancer_profile = ""
@@ -91,9 +116,6 @@ def main():
 
     # Process and apply for jobs
     job_application_processor.process_jobs(jobs, freelancer_profile)
-
-if __name__ == '__main__':
-    main()
 
 if __name__ == '__main__':
     main()
