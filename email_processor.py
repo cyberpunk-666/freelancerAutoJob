@@ -8,6 +8,8 @@ import html
 from bs4 import BeautifulSoup
 import requests
 import configparser
+import os
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -29,10 +31,13 @@ class EmailProcessor:
         self.min_hourly_rate = self.config.get('GENERAL', 'MIN_HOURLY_RATE')
         self.desired_hourly_rate = self.config.get('GENERAL', 'DESIRED_HOURLY_RATE')
         self.mailbox=None
+        
     def connect_to_mailbox(self):
         logging.debug("Connecting to mailbox: %s:%d", self.pop3_server, self.pop3_port)
         try:
             self.mailbox = poplib.POP3_SSL(self.pop3_server, self.pop3_port)
+            logging.debug(f"username:{self.username}")
+            logging.debug(f"password:{self.password}")
             self.mailbox.user(self.username)
             self.mailbox.pass_(self.password)
             logging.info("Successfully connected to mailbox")
@@ -104,6 +109,24 @@ class EmailProcessor:
             logging.debug("Message not from target sender: %s", message['from'])
             
         return None
+        
+    def str_to_bool(self, s: str) -> bool:
+        """
+        Convert a string to a boolean.
+        
+        Args:
+            s (str): The string to convert.
+            
+        Returns:
+            bool: The converted boolean value.
+        """
+        if s.lower() in ('true', 'yes', '1'):
+            return True
+        elif s.lower() in ('false', 'no', '0'):
+            return False
+        else:
+            raise ValueError(f"Cannot convert {s} to boolean")
+    
 
     def fetch_jobs(self):
         logging.debug("Fetching jobs")
@@ -111,17 +134,41 @@ class EmailProcessor:
         num_messages = len(self.mailbox.list()[1])
         num_messages_to_read = min(self.num_messages_to_read, num_messages)
         jobs = []
-
+        use_cache = self.str_to_bool(self.config.get("GENERAL", "USE_CACHE"))
+    
+        processed_email_ids = self.load_processed_emails()
+    
         for i in range(num_messages - num_messages_to_read + 1, num_messages + 1):
             logging.debug("Reading message %d of %d", i, num_messages)
             retr_result = self.mailbox.retr(i)
             response, lines, octets = retr_result
             msg_content = b'\r\n'.join(lines).decode('utf-8')
             message = parser.Parser().parsestr(msg_content)
+            message_id = message['message-id']
+    
+            if use_cache and (message_id in processed_email_ids):
+                logging.debug(f"use_cache:{use_cache}")
+                logging.debug("Skipping already processed email: %s", message_id)
+                continue
+    
             job = self.process_message(message)
             if job:
                 jobs.append(job)
-
+                processed_email_ids.append(message_id)
+    
         self.mailbox.quit()
         logging.info("Fetched %d jobs", len(jobs))
+        
+        self.save_processed_emails(processed_email_ids)
+    
         return jobs
+
+    def load_processed_emails(self, filename='processed_emails.json'):
+        if os.path.exists(filename):
+            with open(filename, 'r') as file:
+                return json.load(file)
+        return []
+    
+    def save_processed_emails(self, email_ids, filename='processed_emails.json'):
+        with open(filename, 'w') as file:
+            json.dump(email_ids, file)

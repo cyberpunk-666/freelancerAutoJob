@@ -29,6 +29,8 @@ class EmailSender:
         try:
             # Create the server connection
             self.logger.info("Connecting to the SMTP server")
+            self.logger.debug(f"smtp server:{self.smtp_server}")
+            self.logger.debug(f"smtp port:{self.smtp_port}")
             server = smtplib.SMTP(self.smtp_server, self.smtp_port)
             server.starttls()  # Use TLS
             server.login(self.username, self.password)
