@@ -1,3 +1,4 @@
 logs
 cache.json
 jobs.json
+processed_emails.json
