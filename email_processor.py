@@ -15,8 +15,9 @@ import json
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class EmailProcessor:
-    def __init__(self, config_path='config.cfg'):
-        logging.debug("Initializing EmailProcessor with config path: %s", config_path)
+    def __init__(self, config_path=None):
+        if config_path is None:
+            config_path = os.path.join(os.path.dirname(__file__), 'config.cfg')
         self.config = configparser.ConfigParser()
         self.config.read(config_path)
         
