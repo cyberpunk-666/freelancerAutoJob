@@ -16,11 +16,11 @@ import time
 import os
 
 class JobApplicationProcessor:
-    def __init__(self, openai_api_key):
+    def __init__(self):
         config_path = os.path.join(os.path.dirname(__file__), 'config.cfg')
         self.config = configparser.ConfigParser()
         self.config.read(config_path)
-        self.api_key = openai_api_key
+        self.api_key = self.config.get('API', 'OPENAI_API_KEY')
         self.last_successful_request_time = None
         self.min_time_between_requests = timedelta(seconds=30)  # Minimum time interval between requests (e.g., 60 seconds)
         # Setup logging
