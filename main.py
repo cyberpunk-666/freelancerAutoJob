@@ -6,7 +6,9 @@ import configparser
 
 from email_processor import EmailProcessor
 from job_application_processor import JobApplicationProcessor
+from dotenv import load_dotenv
 
+load_dotenv()
 # Ensure config and logger are global
 config = None
 logger = None
@@ -60,13 +62,19 @@ def setup_configs():
     global config
     config_path = os.path.join(os.path.dirname(__file__), 'config.cfg')
     config = configparser.ConfigParser()
-    config.read(config_path)
+    config.read(config_path)    
     logger.debug(f"Config path: {config_path}")
 
 def main():
     setup_configs()
-
-    email_processor = EmailProcessor()
+    
+    # Use environment variables directly
+    email_username = os.getenv('EMAIL_USERNAME')
+    email_password = os.getenv('EMAIL_PASSWORD')
+    openai_api_key = os.getenv('OPENAI_API_KEY')
+    logger.debug(f"username:{email_username}")
+    # Initialize email processor with environment variables
+    email_processor = EmailProcessor(email_username, email_password)
     jobs = email_processor.fetch_jobs()
 
     logger.info("List of job titles fetched:")
@@ -89,7 +97,7 @@ def main():
         logger.error("profile.txt not found")
         return
 
-    job_application_processor = JobApplicationProcessor()
+    job_application_processor = JobApplicationProcessor(openai_api_key)
     job_application_processor.process_jobs(jobs, freelancer_profile)
 
 app = Flask(__name__)
