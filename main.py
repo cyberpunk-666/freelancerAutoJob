@@ -63,9 +63,18 @@ def str_to_bool(s: str) -> bool:
 
 def main():
     setup_configs()
+    
+    # Use environment variables directly
+    email_username = os.getenv('EMAIL_USERNAME')
+    email_password = os.getenv('EMAIL_PASSWORD')
+    openai_api_key = os.getenv('OPENAI_API_KEY')
 
-    # Initialize email processor with config values
-    email_processor = EmailProcessor()
+    if not email_username or not email_password or not openai_api_key:
+        logger.error("One or more environment variables are missing")
+        return
+
+    # Initialize email processor with environment variables
+    email_processor = EmailProcessor(email_username, email_password)
     jobs = email_processor.fetch_jobs()
 
     logger.info("List of job titles fetched:")
@@ -88,7 +97,7 @@ def main():
         logger.error("profile.txt not found")
         return
 
-    job_application_processor = JobApplicationProcessor()
+    job_application_processor = JobApplicationProcessor(openai_api_key)
     job_application_processor.process_jobs(jobs, freelancer_profile)
 
 app = Flask(__name__)

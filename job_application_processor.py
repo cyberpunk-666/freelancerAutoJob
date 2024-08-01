@@ -16,9 +16,10 @@ import time
 import os
 
 class JobApplicationProcessor:
-    def __init__(self):
+    def __init__(self, api_key):
         config_path = os.path.join(os.path.dirname(__file__), 'config.cfg')
         self.config = configparser.ConfigParser()
+        self.api_key = api_key      
         self.config.read(config_path)
         self.api_key = self.config.get('API', 'OPENAI_API_KEY')
         self.last_successful_request_time = None

@@ -15,10 +15,12 @@ import json
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class EmailProcessor:
-    def __init__(self):
+    def __init__(self, username, password):
         config_path = os.path.join(os.path.dirname(__file__), 'config.cfg')
         self.config = configparser.ConfigParser()
         self.config.read(config_path)
+        self.username = username
+        self.password = password        
         logging.info(f"config path:{config_path}")
         self.username = self.config.get('EMAIL', 'USERNAME')
         self.password = self.config.get('EMAIL', 'PASSWORD')
