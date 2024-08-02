@@ -12,3 +12,4 @@ soupsieve==2.5
 urllib3==2.2.2
 flask
 openai
+python-dotenv
