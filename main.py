@@ -15,7 +15,9 @@ load_dotenv(dotenv_path=env_path)
 # Additional debug to check if value is set later
 def check_listening_port():
     port = os.getenv('LISTENING_PORT')
+    host = os.getenv('LISTENING_HOST)
     logger.debug(f"check_listening_port: {port}")
+    logger.debug(f"check_listening_host: {host}")    
     return port
 
 from email_processor import EmailProcessor
