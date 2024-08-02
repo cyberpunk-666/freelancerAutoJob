@@ -15,10 +15,10 @@ load_dotenv(dotenv_path=env_path)
 # Additional debug to check if value is set later
 def check_listening_port():
     port = os.getenv('LISTENING_PORT')
-    host = os.getenv('LISTENING_HOST)
+    host = os.getenv('LISTENING_HOST')
     logger.debug(f"check_listening_port: {port}")
     logger.debug(f"check_listening_host: {host}")    
-    return port
+    return port, host
 
 from email_processor import EmailProcessor
 from job_application_processor import JobApplicationProcessor
@@ -152,6 +152,6 @@ def run_main():
 
 if __name__ == '__main__':
     setup_logger("log", 500)
-    # Check listening port again before running the app
-    listening_port = check_listening_port()
-    app.run(host=os.getenv('LISTENING_HOST', '127.0.0.1'), port=int(listening_port or '5000'))
+    # Check listening port and host again before running the app
+    listening_port, listening_host = check_listening_port()
+    app.run(host=listening_host or '127.0.0.1', port=int(listening_port or '5000'))
