@@ -9,6 +9,7 @@ from logging.handlers import QueueHandler, QueueListener
 
 # Load environment variables from .env file
 env_path = os.path.join(os.path.dirname(__file__), '.env')
+print(f"Loading environment variables from: {env_path}")
 load_dotenv(dotenv_path=env_path)
 
 # Additional debug to check if value is set later
@@ -48,6 +49,9 @@ def setup_logger(log_directory: str, max_length: int):
     # Clear existing handlers to avoid duplication
     if logger.hasHandlers():
         logger.handlers.clear()
+
+    # Ensure the log directory exists
+    os.makedirs(log_directory, exist_ok=True)
 
     # Create handlers
     queue_handler = QueueHandler(log_queue)
