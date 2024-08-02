@@ -1,6 +1,5 @@
 from openai import OpenAI
 import json
-import configparser
 import logging
 import requests
 import re
@@ -204,7 +203,7 @@ class JobApplicationProcessor:
         max_budget = budget_info["max_budget_cad"]
         rate_type = budget_info["rate_type"]
         
-        hourly_rate = float(self.config.get('GENERAL', 'MIN_HOURLY_RATE'))
+        hourly_rate = float(os.getenv('MIN_HOURLY_RATE'))
         total_cost = estimated_time * hourly_rate
         
         if rate_type == "hourly" and min_budget < hourly_rate:
@@ -291,7 +290,7 @@ class JobApplicationProcessor:
 
         This job fits the profile and the budget is acceptable.
         """
-        recipient = self.config.get('SMTP', 'RECIPIENT')
+        recipient = os.getenv('SMTP_RECIPIENT')
         
         try:
             self.email_sender.send_email(subject, body, recipient)
