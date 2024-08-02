@@ -25,9 +25,6 @@ class EmailProcessor:
         self.job_description_classes = os.getenv('JOB_DESCRIPTION_CLASSES').split(',')
         self.min_hourly_rate = float(os.getenv('MIN_HOURLY_RATE'))
         self.desired_hourly_rate = float(os.getenv('DESIRED_HOURLY_RATE'))
-        listening_port= os.getenv('LISTENING_PORT')
-        logging.debug(f"listening_port 2:{listening_port}")
-                
         self.mailbox = None
 
     # Add other methods here, as needed...

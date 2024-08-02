@@ -1,20 +1,24 @@
 import os
-import configparser
 import logging
 from datetime import datetime
-from flask import Flask, jsonify
+from flask import Flask, jsonify, Response, stream_with_context
+from dotenv import load_dotenv
+from queue import Queue, Empty
+import threading
+from logging.handlers import QueueHandler, QueueListener
+
+# Load environment variables from .env file
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(dotenv_path=env_path)
+
+# Additional debug to check if value is set later
+def check_listening_port():
+    port = os.getenv('LISTENING_PORT')
+    logger.debug(f"check_listening_port: {port}")
+    return port
 
 from email_processor import EmailProcessor
 from job_application_processor import JobApplicationProcessor
-
-# Initialize configuration parser
-config = configparser.ConfigParser()
-
-def setup_configs():
-    global config
-    config_path = os.path.join(os.path.dirname(__file__), 'config.cfg')
-    config.read(config_path)
-    logger.debug(f"Config path: {config_path}")
 
 class FlushableStreamHandler(logging.StreamHandler):
     def emit(self, record):
@@ -34,24 +38,45 @@ class MaxLengthFormatter(logging.Formatter):
 
 def setup_logger(log_directory: str, max_length: int):
     global logger
-    os.makedirs(log_directory, exist_ok=True)
-    log_filename = os.path.join(log_directory, f"{datetime.now().strftime('%Y-%m-%d')}.log")
+    # Create a queue to hold log messages
+    log_queue = Queue()
 
-    logger = logging.getLogger()
+    # Setup logger
+    logger = logging.getLogger("main_logger")
     logger.setLevel(logging.DEBUG)
 
-    file_handler = logging.FileHandler(log_filename, mode="w")
+    # Clear existing handlers to avoid duplication
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
+    # Create handlers
+    queue_handler = QueueHandler(log_queue)
+    file_handler = logging.FileHandler(os.path.join(log_directory, f"{datetime.now().strftime('%Y-%m-%d')}.log"), mode="w")
     console_handler = FlushableStreamHandler()
 
+    # Create formatter and add it to handlers
     formatter = MaxLengthFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', max_length=max_length)
+    queue_handler.setFormatter(formatter)
     file_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
 
+    # Add handlers to the logger
+    logger.addHandler(queue_handler)
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
+
+    # Create a listener to handle logs from the queue
+    listener = QueueListener(log_queue, file_handler, console_handler)
+    listener.start()
+
     logger.propagate = False
 
-    return log_filename
+    return log_queue
+
+# Usage
+log_directory = "log"
+max_length = 500
+log_queue = setup_logger(log_directory, max_length)
 
 def str_to_bool(s: str) -> bool:
     if s.lower() in ('true', 'yes', '1'):
@@ -62,28 +87,16 @@ def str_to_bool(s: str) -> bool:
         raise ValueError(f"Cannot convert {s} to boolean")
 
 def main():
-    setup_configs()
+    # Access the global logger
+    global logger
     
-    # Use environment variables directly
-    email_username = os.getenv('EMAIL_USERNAME')
-    email_password = os.getenv('EMAIL_PASSWORD')
-    openai_api_key = os.getenv('OPENAI_API_KEY')
-
-    if not email_username or not email_password or not openai_api_key:
-        logger.error("One or more environment variables are missing")
-        return
-
     # Initialize email processor with environment variables
-    email_processor = EmailProcessor(email_username, email_password)
+    email_processor = EmailProcessor()
     jobs = email_processor.fetch_jobs()
 
     logger.info("List of job titles fetched:")
     for job in jobs:
         logger.info(f"- {job['title']}")
-
-    wait_for_key = str_to_bool(config.get("GENERAL", "WAIT_AFTER_FETCHING_JOBS"))
-    if wait_for_key:
-        input("Press any key to continue...")
 
     freelancer_profile = ""
     try:
@@ -97,22 +110,42 @@ def main():
         logger.error("profile.txt not found")
         return
 
-    job_application_processor = JobApplicationProcessor(openai_api_key)
+    job_application_processor = JobApplicationProcessor()
     job_application_processor.process_jobs(jobs, freelancer_profile)
 
 app = Flask(__name__)
 
-@app.route('/run', methods=['GET'])
-def run_main():
+def run_main_thread():
     try:
         main()
-        return jsonify({"status": "success", "message": "Main function executed successfully"}), 200
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        logger.error(f"Exception in main function: {e}")
+
+@app.route('/run', methods=['GET'])
+def run_main():
+    def log_generator():
+        main_thread = threading.Thread(target=run_main_thread)
+        main_thread.start()
+        
+        while main_thread.is_alive():
+            try:
+                message = log_queue.get(timeout=1)
+                yield f'data: {message}\n\n'
+            except Empty:
+                continue
+
+        # Ensure all remaining messages are processed
+        while not log_queue.empty():
+            try:
+                message = log_queue.get_nowait()
+                yield f'data: {message}\n\n'
+            except Empty:
+                break
+
+    return Response(stream_with_context(log_generator()), content_type='text/event-stream')
 
 if __name__ == '__main__':
     setup_logger("log", 500)
-    setup_configs()
-    listening_host = config.get("GENERAL", "LISTENING_HOST")
-    listening_port = config.get("GENERAL", "LISTENING_PORT")
-    app.run(host=listening_host, port=listening_port)
+    # Check listening port again before running the app
+    listening_port = check_listening_port()
+    app.run(host=os.getenv('LISTENING_HOST', '127.0.0.1'), port=int(listening_port or '5000'))

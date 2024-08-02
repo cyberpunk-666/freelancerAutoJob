@@ -16,26 +16,18 @@ import time
 import os
 
 class JobApplicationProcessor:
-    def __init__(self, api_key):
-        config_path = os.path.join(os.path.dirname(__file__), 'config.cfg')
-        self.config = configparser.ConfigParser()
-        self.api_key = api_key      
-        self.config.read(config_path)
-        self.api_key = self.config.get('API', 'OPENAI_API_KEY')
+    def __init__(self):
+        self.api_key = os.getenv('OPENAI_API_KEY')
         self.last_successful_request_time = None
-        self.min_time_between_requests = timedelta(seconds=30)  # Minimum time interval between requests (e.g., 60 seconds)
-        # Setup logging
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        self.min_time_between_requests = timedelta(seconds=30)
         self.logger = logging.getLogger(__name__)
-        self.client = OpenAI(
-            api_key = self.api_key
-        )
+        self.client = OpenAI(api_key=self.api_key)
         self.cache = self.load_cache()
-        smtp_server = self.config.get('SMTP', 'SMTP_SERVER')
-        smtp_port = self.config.get('SMTP', 'SMTP_PORT')
-        self.smtp_recipient = self.config.get('SMTP', 'RECIPIENT')
-        username = self.config.get('EMAIL', 'USERNAME')
-        password = self.config.get('EMAIL', 'PASSWORD')
+        smtp_server = os.getenv('SMTP_SERVER')
+        smtp_port = int(os.getenv('SMTP_PORT'))
+        self.smtp_recipient = os.getenv('SMTP_RECIPIENT')
+        username = os.getenv('EMAIL_USERNAME')
+        password = os.getenv('EMAIL_PASSWORD')
 
         self.email_sender = EmailSender(smtp_server, smtp_port, username, password)
 
