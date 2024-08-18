@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 import requests
 import os
 import json
+from utils import str_to_bool
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,7 +25,6 @@ class EmailProcessor:
         self.job_link_prefix = os.getenv('JOB_LINK_PREFIX')
         self.job_description_classes = os.getenv('JOB_DESCRIPTION_CLASSES').split(',')
         self.min_hourly_rate = float(os.getenv('MIN_HOURLY_RATE'))
-        self.desired_hourly_rate = float(os.getenv('DESIRED_HOURLY_RATE'))
         listening_port= os.getenv('LISTENING_PORT')
         logging.debug(f"listening_port 2:{listening_port}")
                 
@@ -68,7 +68,7 @@ class EmailProcessor:
 
     def extract_budget(self, soup):
         logging.debug("Extracting budget from HTML")
-        budget = soup.find(attrs={'data-size': 'mid'})
+        budget = soup.find('h2', {'data-size-desktop': 'xlarge'})
         if budget:
             return budget.text.strip()
         return None
@@ -109,24 +109,7 @@ class EmailProcessor:
             logging.debug("Message not from target sender: %s", message['from'])
             
         return None
-        
-    def str_to_bool(self, s: str) -> bool:
-        """
-        Convert a string to a boolean.
-        
-        Args:
-            s (str): The string to convert.
-            
-        Returns:
-            bool: The converted boolean value.
-        """
-        if s.lower() in ('true', 'yes', '1'):
-            return True
-        elif s.lower() in ('false', 'no', '0'):
-            return False
-        else:
-            raise ValueError(f"Cannot convert {s} to boolean")
-    
+
 
     def fetch_jobs(self):
         logging.debug("Fetching jobs")
@@ -134,33 +117,41 @@ class EmailProcessor:
         num_messages = len(self.mailbox.list()[1])
         num_messages_to_read = min(self.num_messages_to_read, num_messages)
         jobs = []
-        use_cache = self.str_to_bool(os.getenv('USE_CACHE'))
-    
+        use_cache = str_to_bool(os.getenv('USE_CACHE'))
+
         processed_email_ids = self.load_processed_emails()
-    
+
         for i in range(num_messages - num_messages_to_read + 1, num_messages + 1):
             logging.debug("Reading message %d of %d", i, num_messages)
-            retr_result = self.mailbox.retr(i)
-            response, lines, octets = retr_result
-            msg_content = b'\r\n'.join(lines).decode('utf-8')
-            message = parser.Parser().parsestr(msg_content)
-            message_id = message['message-id']
-    
-            if use_cache and (message_id in processed_email_ids):
-                logging.debug(f"use_cache:{use_cache}")
-                logging.debug("Skipping already processed email: %s", message_id)
+            try:
+                retr_result = self.mailbox.retr(i)
+                response, lines, octets = retr_result
+                msg_content = b'\r\n'.join(lines).decode('utf-8')
+                message = parser.Parser().parsestr(msg_content)
+                message_id = message['message-id']
+
+                if use_cache and (message_id in processed_email_ids):
+                    logging.debug(f"use_cache: {use_cache}")
+                    logging.debug("Skipping already processed email: %s", message_id)
+                    continue
+
+                job = self.process_message(message)
+                if job:
+                    jobs.append(job)
+                    processed_email_ids.append(message_id)
+            except error_proto as e:
+                logging.error(f"Failed to retrieve message {i}: {e}")
                 continue
-    
-            job = self.process_message(message)
-            if job:
-                jobs.append(job)
-                processed_email_ids.append(message_id)
-    
-        self.mailbox.quit()
+
+        try:
+            self.mailbox.quit()
+        except error_proto as e:
+            logging.error(f"Failed to quit mailbox: {e}")
+
         logging.info("Fetched %d jobs", len(jobs))
-        
+
         self.save_processed_emails(processed_email_ids)
-    
+
         return jobs
 
     def load_processed_emails(self, filename='processed_emails.json'):
