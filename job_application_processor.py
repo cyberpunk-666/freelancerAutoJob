@@ -431,28 +431,18 @@ class JobApplicationProcessor:
                     f"Failed to generate application letter for job '{job_title}'"
                 )
 
-        # Store the summary in the file if there is at least one job
-        if summary["total_jobs"] > 0:
-            summary_content = f"""
-Job Titles and Budgets:
-{"\n".join(job_titles_and_budgets)}
 
-Total jobs processed: {summary['total_jobs']}
-Jobs that don't fit profile: {", ".join(map(str, job_not_fit_indices))}
-Jobs with unacceptable budget: {", ".join(map(str, budget_not_acceptable_indices))}
-Applications sent: {summary['applications_sent']}
------------------------------------------------------------------------------------
-
-            """
-            self.summary_storage.append_summary(summary_content.strip())
-            self.logger.info("Summary stored in the file")
-
-        # Log the summary
-        self.logger.info("Job Processing Summary:")
-        self.logger.info(f"Total jobs processed: {summary['total_jobs']}")
-        self.logger.info(
-            f"Jobs that don't fit profile: {summary['job_not_fit']}")
-        self.logger.info(
-            f"Jobs with unacceptable budget: {summary['budget_not_acceptable']}"
+        summary_content = (
+            "\nJob Titles and Budgets:\n" +
+            "\n".join(job_titles_and_budgets) + "\n\n" +
+            f"Total jobs processed: {summary['total_jobs']}\n" +
+            f"Jobs that don't fit profile: {', '.join(map(str, job_not_fit_indices))}\n" +
+            f"Jobs with unacceptable budget: {', '.join(map(str, budget_not_acceptable_indices))}\n" +
+            f"Applications sent: {summary['applications_sent']}\n" +
+            "-----------------------------------------------------------------------------------\n"
         )
-        self.logger.info(f"Applications sent: {summary['applications_sent']}")
+        self.logger.info(f"Summary: {summary_content}")
+        if summary["total_jobs"] > 0:
+            self.summary_storage.append_summary(summary_content)
+
+

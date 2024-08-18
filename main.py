@@ -87,21 +87,24 @@ def main():
     except FileNotFoundError:
         logger.error("profile.txt not found")
         return
-
-    # Initialize the email sender
-    email_sender = EmailSender(
-        smtp_server=os.getenv('SMTP_SERVER'),
-        smtp_port=int(os.getenv('SMTP_PORT', '25')),
-        username=os.getenv('EMAIL_USERNAME'),
-        password=os.getenv('EMAIL_PASSWORD')
-    )
-
-    # Initialize the summary storage
-    summary_storage = SummaryStorage()
-
-    # Initialize the job application processor
-    job_application_processor = JobApplicationProcessor(email_sender, summary_storage)
-    job_application_processor.process_jobs(jobs, freelancer_profile)
+    try:
+        # Initialize the email sender
+        email_sender = EmailSender(
+            smtp_server=os.getenv('SMTP_SERVER'),
+            smtp_port=int(os.getenv('SMTP_PORT', '25')),
+            username=os.getenv('EMAIL_USERNAME'),
+            password=os.getenv('EMAIL_PASSWORD')
+        )
+    
+        # Initialize the summary storage
+        summary_storage = SummaryStorage()
+    
+        # Initialize the job application processor
+        job_application_processor = JobApplicationProcessor(email_sender, summary_storage)
+        job_application_processor.process_jobs(jobs, freelancer_profile)
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        
 
 app = Flask(__name__)
 
