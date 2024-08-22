@@ -344,27 +344,21 @@ class JobApplicationProcessor:
         job_titles_and_budgets = []
         job_not_fit_indices = []
         budget_not_acceptable_indices = []
-
+        summary["total_jobs"] = len(jobs)
         for job in jobs:
             job_title = job['title']
             job_description = job['description']
             budget_text = job['budget']
-            summary["total_jobs"] += 1
-            self.logger.info(f'Full job data: {job}')
             self.logger.info(f"Processing job: {job_title}")
 
 
             # Parse budget
             budget_info = self.parse_budget(budget_text)
             if budget_info is None:
-                self.logger.warning(
+                self.logger.error(
                     f"Skipping job '{job_title}' due to missing or invalid budget information."
                 )
                 continue
-
-          # Log budget_text to ensure it's populated
-            self.logger.info(
-                f'Extracted budget text for job "{job_title}": {budget_text}')
 
             if not budget_text:
                 self.logger.warning(

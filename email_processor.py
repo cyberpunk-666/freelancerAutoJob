@@ -139,13 +139,13 @@ class EmailProcessor:
                 if job:
                     jobs.append(job)
                     processed_email_ids.append(message_id)
-            except error_proto as e:
+            except poplib.error_proto as e:
                 logging.error(f"Failed to retrieve message {i}: {e}")
                 continue
 
         try:
             self.mailbox.quit()
-        except error_proto as e:
+        except poplib.error_proto as e:
             logging.error(f"Failed to quit mailbox: {e}")
 
         logging.info("Fetched %d jobs", len(jobs))
