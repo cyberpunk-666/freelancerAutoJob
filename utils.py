@@ -26,3 +26,4 @@ def str_to_bool(s: str) -> bool:
         return False
     else:
         raise ValueError(f"Cannot convert {s} to boolean")
+ 
