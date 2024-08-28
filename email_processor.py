@@ -1,4 +1,3 @@
-
 import poplib
 import logging
 from email import parser
@@ -9,6 +8,8 @@ from bs4 import BeautifulSoup
 import requests
 import os
 import json
+import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 from utils import str_to_bool
 
 # Configure logging
@@ -25,19 +26,13 @@ class EmailProcessor:
         self.job_link_prefix = os.getenv('JOB_LINK_PREFIX')
         self.job_description_classes = os.getenv('JOB_DESCRIPTION_CLASSES').split(',')
         self.min_hourly_rate = float(os.getenv('MIN_HOURLY_RATE'))
-        listening_port= os.getenv('LISTENING_PORT')
-        logging.debug(f"listening_port 2:{listening_port}")
-                
+        self.processed_emails = self.load_processed_emails()
         self.mailbox = None
 
-    # Add other methods here, as needed...
-        
     def connect_to_mailbox(self):
         logging.debug("Connecting to mailbox: %s:%d", self.pop3_server, self.pop3_port)
         try:
             self.mailbox = poplib.POP3_SSL(self.pop3_server, self.pop3_port)
-            logging.debug(f"username:{self.username}")
-            logging.debug(f"password:{self.password}")
             self.mailbox.user(self.username)
             self.mailbox.pass_(self.password)
             logging.info("Successfully connected to mailbox")
@@ -73,7 +68,6 @@ class EmailProcessor:
             return budget.text.strip()
         return None
 
-    
     def process_message(self, message):
         logging.debug("Processing message from: %s", message['from'])
         if self.target_sender in message['from']:
@@ -110,6 +104,29 @@ class EmailProcessor:
             
         return None
 
+    def fetch_email(self, index):
+        logging.debug("Fetching email %d", index)
+        try:
+            retr_result = self.mailbox.retr(index)
+            response, lines, octets = retr_result
+            msg_content = b'\r\n'.join(lines).decode('utf-8')
+            message = parser.Parser().parsestr(msg_content)
+            message_id = message['message-id']
+
+            if message_id in self.processed_emails:
+                logging.debug("Skipping already processed email: %s", message_id)
+                return None
+
+            job = self.process_message(message)
+            if job:
+                self.processed_emails.append(message_id)  # Track processed email ID
+                return job, message_id
+        except poplib.error_proto as e:
+            logging.error(f"Failed to retrieve message {index}: {e}")
+            # Log the full details of the exception
+            logging.exception("Exception details:")
+
+        return None
 
     def fetch_jobs(self):
         logging.debug("Fetching jobs")
@@ -117,42 +134,23 @@ class EmailProcessor:
         num_messages = len(self.mailbox.list()[1])
         num_messages_to_read = min(self.num_messages_to_read, num_messages)
         jobs = []
-        use_cache = str_to_bool(os.getenv('USE_CACHE'))
 
-        processed_email_ids = self.load_processed_emails()
-
-        for i in range(num_messages - num_messages_to_read + 1, num_messages + 1):
-            logging.debug("Reading message %d of %d", i, num_messages)
-            try:
-                retr_result = self.mailbox.retr(i)
-                response, lines, octets = retr_result
-                msg_content = b'\r\n'.join(lines).decode('utf-8')
-                message = parser.Parser().parsestr(msg_content)
-                message_id = message['message-id']
-
-                if use_cache and (message_id in processed_email_ids):
-                    logging.debug(f"use_cache: {use_cache}")
-                    logging.debug("Skipping already processed email: %s", message_id)
-                    continue
-
-                job = self.process_message(message)
-                if job:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future_to_index = {executor.submit(self.fetch_email, i): i for i in range(num_messages - num_messages_to_read + 1, num_messages + 1)}
+            
+            for future in concurrent.futures.as_completed(future_to_index):
+                result = future.result()
+                if result:
+                    job, message_id = result
                     jobs.append(job)
-                    processed_email_ids.append(message_id)
-            except poplib.error_proto as e:
-                logging.error(f"Failed to retrieve message {i}: {e}")
-                continue
+                    yield jobs, message_id  # Yield jobs and the corresponding message ID
 
         try:
             self.mailbox.quit()
         except poplib.error_proto as e:
             logging.error(f"Failed to quit mailbox: {e}")
 
-        logging.info("Fetched %d jobs", len(jobs))
-
-        self.save_processed_emails(processed_email_ids)
-
-        return jobs
+        logging.info("Finished fetching jobs")
 
     def load_processed_emails(self, filename='processed_emails.json'):
         if os.path.exists(filename):
@@ -163,3 +161,7 @@ class EmailProcessor:
     def save_processed_emails(self, email_ids, filename='processed_emails.json'):
         with open(filename, 'w') as file:
             json.dump(email_ids, file)
+
+    def mark_email_as_processed(self, message_id):
+        self.save_processed_emails(self.processed_emails)
+        logging.info(f"Marked email as processed: {message_id}")

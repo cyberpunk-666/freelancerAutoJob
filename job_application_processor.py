@@ -1,55 +1,46 @@
-from openai import OpenAI
-import json
 import logging
-import requests
-import re
 import os
+import json
 import hashlib
-from email_sender import EmailSender
-import time
-from datetime import datetime, timedelta
-import time
+import requests
+from concurrent.futures import ThreadPoolExecutor
 from utils import str_to_bool
 
-import os
-
-
 class JobApplicationProcessor:
-
     def __init__(self, email_sender, summary_storage):
         self.email_sender = email_sender
         self.summary_storage = summary_storage
         self.logger = logging.getLogger(__name__)
-        self.cache = self.load_cache()
         self.api_key = os.getenv('OPENAI_API_KEY')
         self.use_gpt_cache = str_to_bool(os.getenv('USE_GPT_CACHE', 'true'))
         self.cache = self.load_cache() if self.use_gpt_cache else {}
+        self.logger.info("JobApplicationProcessor initialized.")
 
     def load_cache(self):
+        """Load the GPT response cache from a file if it exists."""
         if os.path.exists("cache.json"):
             try:
                 with open("cache.json", 'r') as file:
                     cache = json.load(file)
-                self.logger.info('Cache loaded from file')
+                self.logger.info('Cache loaded from file.')
                 return cache
             except Exception as e:
-                self.logger.error(f'Failed to load cache from file: {str(e)}')
+                self.logger.error(f'Failed to load cache from file: {e}')
         return {}
 
     def save_cache(self):
+        """Save the GPT response cache to a file."""
         try:
             with open("cache.json", 'w') as file:
                 json.dump(self.cache, file)
-            self.logger.info('Cache saved to file')
+            self.logger.info('Cache saved to file.')
         except Exception as e:
-            self.logger.error(f'Failed to save cache to file: {str(e)}')
+            self.logger.error(f'Failed to save cache to file: {e}')
 
     def extract_json_string(self, input_string):
-        self.logger.info('Starting extraction process')
-
+        """Extract a JSON string from a larger text string."""
+        self.logger.info('Starting extraction process.')
         try:
-            self.logger.info('Attempting to find JSON string in the input')
-            # Use a stack to handle nested braces
             stack = []
             json_start = None
 
@@ -63,30 +54,20 @@ class JobApplicationProcessor:
                     if not stack and json_start is not None:
                         json_str = input_string[json_start:i + 1]
                         self.logger.info(f'Found JSON string: {json_str}')
-
-                        # Load the found JSON string to verify its validity
                         json_obj = json.loads(json_str)
-                        self.logger.info('JSON string is valid')
-                        return json.dumps(
-                            json_obj)  # Return the valid JSON string
-
-            self.logger.warning('No JSON string found in the input')
+                        self.logger.info('JSON string is valid.')
+                        return json.dumps(json_obj)
+            self.logger.warning('No JSON string found in the input.')
             return None
         except (json.JSONDecodeError, IndexError) as e:
-            self.logger.error(
-                f'Error during extraction or validation: {str(e)}')
+            self.logger.error(f'Error during extraction or validation: {e}')
             return None
 
-    def send_to_gpt(self,
-                    prompt,
-                    max_tokens=300,
-                    model="gpt-3.5-turbo-1106",
-                    max_retries=5):
-        self.logger.info(f'Sending prompt: {prompt}')
+    def send_to_gpt(self, prompt, max_tokens=300, model="gpt-3.5-turbo-1106", max_retries=5):
+        """Send a prompt to the GPT model and return the response."""
+        self.logger.info(f'Sending prompt to GPT: {prompt}')
 
-        # Create a unique cache key
-        cache_key = hashlib.md5(
-            f'{prompt}{max_tokens}{model}'.encode()).hexdigest()
+        cache_key = hashlib.md5(f'{prompt}{max_tokens}{model}'.encode()).hexdigest()
 
         if self.use_gpt_cache and cache_key in self.cache:
             self.logger.info(f'Using cached response for prompt: {prompt}')
@@ -100,34 +81,18 @@ class JobApplicationProcessor:
                     'Authorization': f'Bearer {self.api_key}'
                 }
                 data = {
-                    'model':
-                    model,
-                    'messages': [{
-                        "role": "system",
-                        "content": "You are an intelligent assistant."
-                    }, {
-                        "role": "user",
-                        "content": prompt
-                    }],
-                    'max_tokens':
-                    max_tokens,
-                    'temperature':
-                    0.7
+                    'model': model,
+                    'messages': [{"role": "system", "content": "You are an intelligent assistant."}, {"role": "user", "content": prompt}],
+                    'max_tokens': max_tokens,
+                    'temperature': 0.7
                 }
 
-                response = requests.post(
-                    'https://api.aimlapi.com/chat/completions',
-                    headers=headers,
-                    json=data)
-                response.raise_for_status(
-                )  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
-
+                response = requests.post('https://api.aimlapi.com/chat/completions', headers=headers, json=data)
+                response.raise_for_status()
                 response_data = response.json()
-                response_str = response_data['choices'][0]['message'][
-                    'content'].strip()
-                self.logger.info(f'GPT answer: {response_str}')
+                response_str = response_data['choices'][0]['message']['content'].strip()
+                self.logger.info(f'GPT response received: {response_str}')
 
-                # Cache the response if caching is enabled and response is valid
                 if self.use_gpt_cache and "ERROR" not in response_str:
                     self.cache[cache_key] = response_str
                     self.save_cache()
@@ -135,26 +100,20 @@ class JobApplicationProcessor:
                 return response_str
 
             except requests.exceptions.RequestException as e:
-                self.logger.error(f"Failed to get response from GPT: {str(e)}")
-                self.logger.error(
-                    f"Request payload: {json.dumps(data, indent=2)}")
-
+                self.logger.error(f"Failed to get response from GPT: {e}")
                 if response is not None:
                     self.logger.error(f"Response content: {response.text}")
 
-                    # Check for 429 status code
-                    if response.status_code == 429:
-                        self.logger.error(
-                            "Too many requests. Stopping further execution.")
-                        raise SystemExit(
-                            "Too many requests. Execution stopped."
-                        )  # Stop execution
+                if response is not None and response.status_code == 429:
+                    self.logger.error("Too many requests. Stopping further execution.")
+                    raise SystemExit("Too many requests. Execution stopped.")
 
                 retries += 1
         self.logger.error(f"Exceeded maximum retries for prompt: {prompt}")
         return None
 
     def parse_budget(self, budget_text):
+        """Parse the budget text using GPT and return it in a structured format."""
         if not budget_text:
             self.logger.error("Budget text is missing or empty.")
             return None
@@ -178,33 +137,30 @@ class JobApplicationProcessor:
                     return None
                 return json.loads(json_str)
             except json.JSONDecodeError:
-                self.logger.error(
-                    f"Failed to decode JSON response: {response_text}")
+                self.logger.error(f"Failed to decode JSON response: {response_text}")
                 return None
         return None
 
     def extract_first_number(self, input_string):
-        self.logger.info('Starting number extraction process')
+        """Extract the first numeric value found in a string."""
+        self.logger.info('Starting number extraction process.')
 
         try:
-            self.logger.info(
-                'Attempting to find the first numeric value in the input')
-            # Use regular expression to find the first numeric value in the input string
             match = re.search(r'\d+', input_string)
             if match:
                 number = int(match.group())
                 self.logger.info(f'Found numeric value: {number}')
                 return number
             else:
-                self.logger.warning('No numeric value found in the input')
+                self.logger.warning('No numeric value found in the input.')
                 return None
         except Exception as e:
-            self.logger.error(f'Error during number extraction: {str(e)}')
+            self.logger.error(f'Error during number extraction: {e}')
             return None
 
     def is_budget_acceptable(self, assumption_and_time, budget_info):
-        estimated_time = self.extract_first_number(
-            assumption_and_time["estimated_time"])  # Time in hours
+        """Determine if the budget is acceptable based on the estimated time and rate."""
+        estimated_time = self.extract_first_number(assumption_and_time["estimated_time"])
         estimated_time = estimated_time or 0  # Default to 0 if not found
         min_budget = budget_info["min_budget_cad"]
         max_budget = budget_info["max_budget_cad"]
@@ -214,16 +170,16 @@ class JobApplicationProcessor:
         total_cost = estimated_time * hourly_rate
 
         if rate_type == "hourly" and min_budget < hourly_rate:
-            self.logger.info(
-                "The min budget is less than the minimum hourly rate.")
+            self.logger.info("The min budget is less than the minimum hourly rate.")
             return True
 
         self.logger.info(f'total_cost: {total_cost}')
         is_acceptable = total_cost <= max_budget
-        self.logger.info(f"is acceptable: {is_acceptable}")
+        self.logger.info(f"Is budget acceptable: {is_acceptable}")
         return is_acceptable
 
     def generate_application_letter(self, job_description, freelancer_profile):
+        """Generate an application letter using GPT based on the job description and freelancer profile."""
         prompt = f"""
         Job Description: {job_description}
         Freelancer Profile: {freelancer_profile}
@@ -239,6 +195,7 @@ class JobApplicationProcessor:
         return self.send_to_gpt(prompt, max_tokens=500)
 
     def analyse_job_and_time(self, job_description):
+        """Analyze the job description and estimate the time required to complete it."""
         prompt = f"""
         Job Description: {job_description}
 
@@ -258,12 +215,12 @@ class JobApplicationProcessor:
                     return None
                 return json.loads(json_str)
             except json.JSONDecodeError:
-                self.logger.error(
-                    f"Failed to decode JSON response: {response_text}")
+                self.logger.error(f"Failed to decode JSON response: {response_text}")
                 return None
         return None
 
     def analyze_job_fit(self, job_description, freelancer_profile):
+        """Analyze if the job fits the freelancer's profile using GPT."""
         prompt = f"""
         Job Description: {job_description}
         Freelancer Profile: {freelancer_profile}
@@ -284,13 +241,12 @@ class JobApplicationProcessor:
                     return None
                 return json.loads(json_str)
             except json.JSONDecodeError:
-                self.logger.error(
-                    f"Failed to decode JSON response: {response_text}")
+                self.logger.error(f"Failed to decode JSON response: {response_text}")
                 return None
         return None
 
-    def send_job_details_email(self, job_title, job_description,
-                               estimated_time, assumptions, budget_text):
+    def send_job_details_email(self, job_title, job_description, estimated_time, assumptions, budget_text):
+        """Send an email with the details of the job found."""
         subject = f"New Job Found: {job_title}"
         body = f"""
         Job Title: {job_title}
@@ -307,11 +263,10 @@ class JobApplicationProcessor:
             self.email_sender.send_email(subject, body, recipient)
             self.logger.info(f"Email sent to {recipient} with job details.")
         except Exception as e:
-            self.logger.error(f"Failed to send email: {str(e)}")
+            self.logger.error(f"Failed to send email: {e}")
 
-    def send_email(self, job_title, job_description, estimated_time,
-                   assumptions, budget_text, application_letter,
-                   detailed_steps):
+    def send_email(self, job_title, job_description, estimated_time, assumptions, budget_text, application_letter, detailed_steps):
+        """Send an email with the application details for the job."""
         subject = f"Application for {job_title}"
         body = f"""
         Job Title: {job_title}
@@ -322,10 +277,16 @@ class JobApplicationProcessor:
         Application Letter: {application_letter}
         Detailed Steps: {detailed_steps}
         """
-        self.email_sender.send_email(os.getenv('SMTP_RECIPIENT'), subject,
-                                     body)
+        recipient = os.getenv('SMTP_RECIPIENT')
+
+        try:
+            self.email_sender.send_email(recipient, subject, body)
+            self.logger.info(f"Application email sent to {recipient} for job {job_title}.")
+        except Exception as e:
+            self.logger.error(f"Failed to send application email: {e}")
 
     def get_detailed_steps(self, job_description):
+        """Generate detailed steps for approaching the job based on the description."""
         prompt = f"""
         Job Description: {job_description}
 
@@ -333,110 +294,66 @@ class JobApplicationProcessor:
         """
         return self.send_to_gpt(prompt, max_tokens=500)
 
-    def process_jobs(self, jobs, freelancer_profile):
-        summary = {
-            "total_jobs": 0,
-            "job_not_fit": 0,
-            "budget_not_acceptable": 0,
-            "applications_sent": 0,
-        }
+    def process_jobs_from_email(self, jobs, message_id, email_processor):
+        """Process all jobs from a single email and mark the email as processed if successful."""
+        try:
+            # Process jobs in parallel
+            self.process_jobs_in_parallel(jobs)
+            email_processor.mark_email_as_processed(message_id)
+        except Exception as e:
+            self.logger.error(f"An error occurred while processing jobs from email {message_id}: {e}")
+            # Do not mark the email as processed
 
-        job_titles_and_budgets = []
-        job_not_fit_indices = []
-        budget_not_acceptable_indices = []
-        summary["total_jobs"] = len(jobs)
-        for job in jobs:
-            job_title = job['title']
-            job_description = job['description']
-            budget_text = job['budget']
-            self.logger.info(f"Processing job: {job_title}")
+    def process_jobs_in_parallel(self, jobs):
+        """Process a list of jobs in parallel using ThreadPoolExecutor."""
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            results = list(executor.map(self.process_job, jobs))
+        return results
 
+    def process_job(self, job):
+        """Process a single job by analyzing, preparing an application letter, and sending an email."""
+        try:
+            self.logger.info(f"Processing job: {job['title']}")
 
-            # Parse budget
-            budget_info = self.parse_budget(budget_text)
-            if budget_info is None:
-                self.logger.error(
-                    f"Skipping job '{job_title}' due to missing or invalid budget information."
-                )
-                continue
-
-            if not budget_text:
-                self.logger.warning(
-                    f"No budget information found for job '{job_title}'. Skipping..."
-                )
-                continue
-
-            # Collect job titles and budgets
-            job_titles_and_budgets.append(
-                f"{len(job_titles_and_budgets) + 1}. Job Title: {job_title}, Budget: {budget_text}"
-            )
-
-            # Check job fit
-            job_fit = self.analyze_job_fit(job_description, freelancer_profile)
-            if not job_fit or not job_fit['fit']:
-                self.logger.info(
-                    f"Skipping job '{job_title}' because it does not fit the freelancer's profile."
-                )
-                summary["job_not_fit"] += 1
-                job_not_fit_indices.append(len(job_titles_and_budgets))
-                continue
-
-            # Estimate time
-            assumption_and_time = self.analyse_job_and_time(job_description)
+            # Analyze the job and determine the time required
+            assumption_and_time = self.analyse_job_and_time(job['description'])
             if not assumption_and_time:
-                self.logger.warning(
-                    f"Skipping job '{job_title}' due to failure in estimating job"
-                )
-                continue
+                self.logger.warning(f"Skipping job '{job['title']}' due to failure in estimating time.")
+                return
 
-            # Check if budget is acceptable
+            # Parse the budget
+            budget_info = self.parse_budget(job['budget'])
+            if not budget_info:
+                self.logger.warning(f"Skipping job '{job['title']}' due to invalid budget information.")
+                return
+
+            # Check if the budget is acceptable
             if not self.is_budget_acceptable(assumption_and_time, budget_info):
-                self.logger.info(
-                    f"Skipping job '{job_title}' because the estimated cost is not within the budget range."
-                )
-                summary["budget_not_acceptable"] += 1
-                budget_not_acceptable_indices.append(
-                    len(job_titles_and_budgets))
-                continue
+                self.logger.info(f"Skipping job '{job['title']}' because the budget is not acceptable.")
+                return
 
-            estimated_time = self.extract_first_number(
-                assumption_and_time['estimated_time'])
-            self.logger.info(f"Applying for job '{job_title}'")
-            self.logger.info(f"Estimated time: {estimated_time}")
-            self.logger.info(
-                f"Assumptions: {assumption_and_time['assumptions']}")
+            # Analyze if the job fits the freelancer's profile
+            job_fit = self.analyze_job_fit(job['description'], job['profile'])
+            if not job_fit or not job_fit['fit']:
+                self.logger.info(f"Skipping job '{job['title']}' because it does not fit the freelancer's profile.")
+                return
 
-            # Generate application letter
-            application_letter = self.generate_application_letter(
-                job_description, freelancer_profile)
-            if application_letter:
-                # Get detailed steps
-                detailed_steps = self.get_detailed_steps(job_description)
+            # Generate the application letter
+            application_letter = self.generate_application_letter(job['description'], job['profile'])
+            if not application_letter:
+                self.logger.error(f"Failed to generate application letter for job '{job['title']}'")
+                return
 
-                # Send email
-                self.send_email(job_title, job_description, estimated_time,
-                                assumption_and_time['assumptions'],
-                                budget_text, application_letter,
-                                detailed_steps)
-                self.logger.info(f"Email sent for job '{job_title}'")
-                summary["applications_sent"] += 1
-            else:
-                self.logger.error(
-                    f"Failed to generate application letter for job '{job_title}'"
-                )
+            # Generate detailed steps for the application
+            detailed_steps = self.get_detailed_steps(job['description'])
+            if not detailed_steps:
+                self.logger.error(f"Failed to generate detailed steps for job '{job['title']}'")
+                return
 
+            # Send the application email
+            self.send_email(job['title'], job['description'], assumption_and_time['estimated_time'], 
+                            assumption_and_time['assumptions'], job['budget'], application_letter, detailed_steps)
 
-        summary_content = (
-            "\nJob Titles and Budgets:\n" +
-            "\n".join(job_titles_and_budgets) + "\n\n" +
-            f"Total jobs processed: {summary['total_jobs']}\n" +
-            f"Jobs that don't fit profile: {', '.join(map(str, job_not_fit_indices))}\n" +
-            f"Jobs with unacceptable budget: {', '.join(map(str, budget_not_acceptable_indices))}\n" +
-            f"Applications sent: {summary['applications_sent']}\n" +
-            "-----------------------------------------------------------------------------------\n"
-        )
-        self.logger.info(f"Summary: {summary_content}")
-        if summary["total_jobs"] > 0:
-            self.summary_storage.append_summary(summary_content)
-
+        except Exception as e:
+            self.logger.error(f"Failed to process job '{job['title']}': {e}")
 
