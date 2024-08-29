@@ -11,9 +11,9 @@ import json
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 from utils import str_to_bool
-
-# Configure logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+import threading
+import time
+from email.utils import parsedate_to_datetime
 
 class EmailProcessor:
     def __init__(self):
@@ -26,6 +26,7 @@ class EmailProcessor:
         self.job_link_prefix = os.getenv('JOB_LINK_PREFIX')
         self.job_description_classes = os.getenv('JOB_DESCRIPTION_CLASSES').split(',')
         self.min_hourly_rate = float(os.getenv('MIN_HOURLY_RATE'))
+        self.lock = threading.Lock()
         self.processed_emails = self.load_processed_emails()
         self.mailbox = None
 
@@ -89,11 +90,16 @@ class EmailProcessor:
                                 job_budget = self.extract_budget(soup)
                                 if job_description is not None:
                                     logging.info("Job found: %s", job_title)
+
+                                    # Extract the email date
+                                    email_date = parsedate_to_datetime(message['Date'])
+
                                     return {
                                         'title': job_title,
                                         'description': job_description,
                                         'budget': job_budget,
-                                        'link': link
+                                        'link': link,
+                                        'email_date': email_date
                                     }
                             else:
                                 logging.debug("Link does not start with job link prefix: %s", link)
@@ -104,29 +110,43 @@ class EmailProcessor:
             
         return None
 
-    def fetch_email(self, index):
+
+    def fetch_email(self, index, max_retries=3):
         logging.debug("Fetching email %d", index)
-        try:
-            retr_result = self.mailbox.retr(index)
-            response, lines, octets = retr_result
-            msg_content = b'\r\n'.join(lines).decode('utf-8')
-            message = parser.Parser().parsestr(msg_content)
-            message_id = message['message-id']
+        retries = 0
+        while retries < max_retries:
+            try:
+                retr_result = self.mailbox.retr(index)
+                response, lines, octets = retr_result
+                msg_content = b'\r\n'.join(lines).decode('utf-8')
+                message = parser.Parser().parsestr(msg_content)
+                message_id = message['message-id']
 
-            if message_id in self.processed_emails:
-                logging.debug("Skipping already processed email: %s", message_id)
-                return None
+                if message_id in self.processed_emails:
+                    logging.debug("Skipping already processed email: %s", message_id)
+                    return None
 
-            job = self.process_message(message)
-            if job:
-                self.processed_emails.append(message_id)  # Track processed email ID
-                return job, message_id
-        except poplib.error_proto as e:
-            logging.error(f"Failed to retrieve message {index}: {e}")
-            # Log the full details of the exception
-            logging.exception("Exception details:")
+                job = self.process_message(message)
+                if job:
+                    self.processed_emails.append(message_id)  # Track processed email ID
+                    return job, message_id
+                else:
+                    logging.debug("No job found in email %d. Moving to the next email.", index)
+                    return None  # No retry needed, just move to the next email
 
+            except poplib.error_proto as e:
+                logging.error(f"Failed to retrieve message {index}: {e}")
+                retries += 1
+                wait_time = 2 ** retries  # Exponential backoff
+                logging.warning(f"Retrying to fetch email {index} in {wait_time} seconds (Attempt {retries}/{max_retries}).")
+                time.sleep(wait_time)
+            except Exception as e:
+                logging.error(f"An unexpected error occurred while fetching email {index}: {e}")
+                break  # Exit loop on unexpected errors
+
+        logging.error(f"Exceeded maximum retries for email {index}.")
         return None
+    
 
     def fetch_jobs(self):
         logging.debug("Fetching jobs")
@@ -135,15 +155,12 @@ class EmailProcessor:
         num_messages_to_read = min(self.num_messages_to_read, num_messages)
         jobs = []
 
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future_to_index = {executor.submit(self.fetch_email, i): i for i in range(num_messages - num_messages_to_read + 1, num_messages + 1)}
-            
-            for future in concurrent.futures.as_completed(future_to_index):
-                result = future.result()
-                if result:
-                    job, message_id = result
-                    jobs.append(job)
-                    yield jobs, message_id  # Yield jobs and the corresponding message ID
+        for i in range(num_messages - num_messages_to_read + 1, num_messages + 1):
+            result = self.fetch_email(i)
+            if result:
+                job, message_id = result
+                jobs.append(job)
+                yield jobs, message_id  # Yield jobs and the corresponding message ID
 
         try:
             self.mailbox.quit()
