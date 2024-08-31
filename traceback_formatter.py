@@ -2,15 +2,22 @@ import logging
 import traceback
 
 class TracebackFormatter(logging.Formatter):
+    def __init__(self, fmt=None, datefmt=None, max_length=None):
+        super().__init__(fmt, datefmt)
+        self.max_length = max_length 
+
     def format(self, record):
-        # Format the original log message
+        # Call the original format method to get the initial formatted message
         formatted_message = super().format(record)
-        # Check if the log level is ERROR and exception info is present
-        if record.levelno == logging.ERROR and record.exc_info:
-            # Format the traceback
-            error_details = ''.join(traceback.format_exception(*record.exc_info))
-            # Append the traceback to the original message
-            formatted_message = f"{formatted_message}\n{error_details}"
+
+        # If there's an exception, append the formatted traceback to the message
+        if record.exc_info:
+            formatted_message += f"\n{traceback.format_exc()}"
+
+        # Truncate the message if it exceeds max_length
+        if self.max_length and len(formatted_message) > self.max_length:
+            formatted_message = formatted_message[:self.max_length] + '...'
+
         return formatted_message
 
 # Example usage
@@ -34,5 +41,7 @@ class TracebackFormatter(logging.Formatter):
 #         1 / 0
 #     except Exception:
 #         logger.error("An error occurred", exc_info=True)
+
+
 
 

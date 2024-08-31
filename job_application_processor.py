@@ -2,13 +2,15 @@ import logging
 import os
 import json
 import hashlib
+import psycopg2
 import requests
 from concurrent.futures import ThreadPoolExecutor
 from utils import str_to_bool
 import re
 import traceback
 import time
-import datetime
+from datetime import datetime
+
 class JobApplicationProcessor:
     def __init__(self, email_sender, job_details):
         self.job_details = job_details
@@ -77,64 +79,12 @@ class JobApplicationProcessor:
             time.sleep(time_to_wait)
         self.last_api_call_time = time.time()
 
-    def send_to_gpt(self, prompt, max_tokens=4000, model="gpt-3.5-turbo-1106", max_retries=5):
-        """Send a prompt to the GPT model and return the response."""
-        self.logger.info(f'Sending prompt to GPT: {prompt}')
-
-        cache_key = hashlib.md5(
-            f'{prompt}{max_tokens}{model}'.encode()).hexdigest()
-
-        if self.use_gpt_cache and cache_key in self.cache:
-            self.logger.info(f'Using cached response for prompt: {prompt}')
-            return self.cache[cache_key]
-
-        retries = 0
-        while retries < max_retries:
-            try:
-                headers = {
-                    'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {self.api_key}'
-                }
-                data = {
-                    'model': model,
-                    'messages': [{"role": "system", "content": "You are an intelligent assistant."}, {"role": "user", "content": prompt}],
-                    'max_tokens': max_tokens,
-                    'temperature': 0.7
-                }
-
-                response = requests.post(
-                    'https://api.aimlapi.com/chat/completions', headers=headers, json=data)
-                response.raise_for_status()
-                response_data = response.json()
-                response_str = response_data['choices'][0]['message']['content'].strip(
-                )
-                self.logger.info(f'GPT response received: {response_str}')
-
-                if self.use_gpt_cache and "ERROR" not in response_str:
-                    self.cache[cache_key] = response_str
-                    self.save_cache()
-
-                return response_str
-
-            except requests.exceptions.RequestException as e:
-                self.logger.error(f"Failed to get response from GPT: {e}")
-                if response is not None:
-                    self.logger.error(f"Response content: {response.text}")
-
-                if response is not None and response.status_code == 429:
-                    self.logger.error(
-                        "Too many requests. Stopping further execution.")
-                    raise SystemExit("Too many requests. Execution stopped.")
-
-                retries += 1
-        self.logger.error(f"Exceeded maximum retries for prompt: {prompt}")
-        return None
 
     def send_to_gemini(self, prompt, response_schema=None, max_tokens=4000, max_retries=5):
         """Send a prompt to the Gemini model and return the response based on the provided schema."""
         self.delay_if_necessary()  # Ensure rate limiting
 
-        self.logger.info(f'Sending prompt to Gemini: {prompt}')
+        # self.logger.info(f'Sending prompt to Gemini: {prompt}')
         cache_key = hashlib.md5(f'{prompt}'.encode()).hexdigest()
 
         if self.use_gpt_cache and cache_key in self.cache:
@@ -142,6 +92,7 @@ class JobApplicationProcessor:
             return self.cache[cache_key]
 
         retries = 0
+        wait_time = 10
         while retries < max_retries:
             try:
                 url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
@@ -255,35 +206,43 @@ class JobApplicationProcessor:
             self.logger.error(f'Error during number extraction: {e}')
             return None
 
-    def is_budget_acceptable(self, assumption_and_time, budget_info):
-        """Determine if the budget is acceptable based on the estimated time and rate."""
-        estimated_time = self.extract_first_number(
-            assumption_and_time["estimated_time"])
-        estimated_time = estimated_time or 0  # Default to 0 if not found
-        min_budget = budget_info["min_budget_cad"]
-        max_budget = budget_info["max_budget_cad"]
-        rate_type = budget_info["rate_type"]
-
-        hourly_rate = float(os.getenv('MIN_HOURLY_RATE') or 0.0)
-        total_cost = estimated_time * hourly_rate
-
-        if rate_type == "hourly" and min_budget < hourly_rate:
-            self.logger.info(
-                "The min budget is less than the minimum hourly rate.")
-            return True
-
-        self.logger.info(f'total_cost: {total_cost}')
+    def is_budget_acceptable(self, analysis_summary, budget_info):
+        """Determine if the budget is acceptable based on the estimated time in hours and rate."""
         try:
-            is_acceptable = total_cost <= float(max_budget)
-        except ValueError:
-            # Gérer le cas où max_budget ne peut pas être converti en float
-            self.logger.error(f"Invalid max_budget value: {max_budget}")
-            is_acceptable = False
-        self.logger.info(f"Is budget acceptable: {is_acceptable}")
-        return is_acceptable
+            # Directly extract the estimated total time in hours from the analysis summary
+            estimated_hours = int(analysis_summary['total_estimated_time'].replace('hours', '').strip())
+
+            # Extract budget details
+            min_budget = float(budget_info["min_budget_cad"])
+            max_budget = float(budget_info["max_budget_cad"])
+            rate_type = budget_info["rate_type"]
+
+            hourly_rate = float(os.getenv('MIN_HOURLY_RATE') or 0.0)
+
+            # Calculate the total cost based on the estimated hours and hourly rate
+            total_cost = estimated_hours * hourly_rate
+
+            if rate_type == "hourly" and min_budget < hourly_rate:
+                self.logger.info("The min budget is less than the minimum hourly rate.")
+                return False  # Not acceptable if the hourly rate is less than the minimum
+
+            if rate_type == "fixed":
+                is_acceptable = min_budget <= total_cost <= max_budget
+            else:
+                is_acceptable = total_cost <= max_budget
+
+            self.logger.info(f"Total estimated time: {estimated_hours} hours")
+            self.logger.info(f"Total cost: {total_cost:.2f}, Budget range: {min_budget} - {max_budget}")
+            self.logger.info(f"Is budget acceptable: {is_acceptable}")
+            
+            return is_acceptable
+
+        except ValueError as e:
+            self.logger.error(f"Invalid budget information provided: {e}")
+            return False
 
     def generate_application_letter(self, job_description, freelancer_profile):
-        """Generate an application letter using GPT based on the job description and freelancer profile."""
+        """Generate an application letter using Gemini based on the job description and freelancer profile."""
         prompt = f"""
         Job Description: {job_description}
         Freelancer Profile: {freelancer_profile}
@@ -296,7 +255,31 @@ class JobApplicationProcessor:
         - A closing statement emphasizing enthusiasm for the opportunity and availability for further discussion
         """
 
-        return self.send_to_gemini(prompt)
+        # Define the response schema
+        response_schema = {
+            "type": "object",
+            "properties": {
+                "introduction": {"type": "string"},
+                "fit": {"type": "string"},
+                "approach": {"type": "string"},
+                "closing": {"type": "string"}
+            },
+            "required": ["introduction", "fit", "approach", "closing"]
+        }
+
+        # Send the prompt to Gemini with the response schema
+        response_text = self.send_to_gemini(prompt, response_schema)
+        if response_text:
+            try:
+                json_str = self.extract_json_string(response_text)
+                if not json_str:
+                    return None
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                self.logger.error(
+                    f"Failed to decode structured response: {response_text}")
+                return None
+        return None
 
     def analyse_job_and_time(self, job_description):
         """Analyze the job description and estimate the time required to complete it."""
@@ -359,25 +342,6 @@ class JobApplicationProcessor:
                 return None
         return None
 
-    def send_job_details_email(self, job_title, job_description, estimated_time, assumptions, budget_text):
-        """Send an email with the details of the job found."""
-        subject = f"New Job Found: {job_title}"
-        body = f"""
-        Job Title: {job_title}
-        Job Description: {job_description}
-        Budget: {budget_text}
-        Estimated Time: {estimated_time} hours
-        Assumptions: {assumptions}
-
-        This job fits the profile and the budget is acceptable.
-        """
-        recipient = os.getenv('SMTP_RECIPIENT')
-
-        try:
-            self.email_sender.send_email(subject, body, recipient)
-            self.logger.info(f"Email sent to {recipient} with job details.")
-        except Exception as e:
-            self.logger.error(f"Failed to send email: {e}")
 
     def send_email(self, job_title, job_description, estimated_time, assumptions, budget_text, application_letter, detailed_steps):
         """Send an email with the application details for the job."""
@@ -401,14 +365,96 @@ class JobApplicationProcessor:
             error_details = traceback.format_exc()
             self.logger.error(f"Failed to send application email: {e}\n{error_details}")            
 
+    def summarize_analysis(self, detailed_steps):
+        """Summarize the analysis including the total estimated time and assumptions."""
+        prompt = f"""
+        Detailed Steps: {json.dumps(detailed_steps['steps'], indent=2)}
+
+        Based on the detailed steps provided, summarize the overall analysis including:
+        - Assumptions made during the estimation.
+        - Total estimated time in hours. Ensure that the time is provided directly in hours (e.g., "160 hours").
+        - Any additional considerations or potential challenges.
+
+        The summary should be concise and structured for inclusion in a project proposal.
+        """
+
+        # Define the response schema with instructions for clarity
+        response_schema = {
+            "type": "object",
+            "properties": {
+                "assumptions": {
+                    "type": "string",
+                    "description": "Assumptions made during the time estimation process."
+                },
+                "total_estimated_time": {
+                    "type": "string",
+                    "description": "Total estimated time in hours, formatted as 'XXX hours'. Ensure the time is calculated in hours."
+                },
+                "additional_considerations": {
+                    "type": "string",
+                    "description": "Any additional considerations or challenges that could affect the project."
+                }
+            },
+            "required": ["assumptions", "total_estimated_time"]
+        }
+
+        # Send the prompt to Gemini with the response schema
+        response_text = self.send_to_gemini(prompt, response_schema)
+        if response_text:
+            try:
+                json_str = self.extract_json_string(response_text)
+                if not json_str:
+                    return None
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                self.logger.error(f"Failed to decode structured response: {response_text}")
+                return None
+        return None
+
+
+
     def get_detailed_steps(self, job_description):
         """Generate detailed steps for approaching the job based on the description."""
         prompt = f"""
         Job Description: {job_description}
 
-        Write a detailed step-by-step plan to approach the tasks described in the job description. Provide the response in a clear, structured format.
+        Write a detailed step-by-step plan to approach the tasks described in the job description.
+        Provide the response in a clear, structured format.
         """
-        return self.send_to_gemini(prompt)
+        
+        # Define the response schema
+        response_schema = {
+            "type": "object",
+            "properties": {
+                "steps": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {"type": "string"},
+                            "description": {"type": "string"},
+                            "estimatedTime": {"type": "string"}
+                        },
+                        "required": ["title", "description", "estimatedTime"]
+                    }
+                }
+            },
+            "required": ["steps"]
+        }
+
+        # Send the prompt to Gemini with the response schema
+        response_text = self.send_to_gemini(prompt, response_schema)
+        if response_text:
+            try:
+                json_str = self.extract_json_string(response_text)
+                if not json_str:
+                    return None
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                self.logger.error(
+                    f"Failed to decode structured response: {response_text}")
+                return None
+        return None
 
     def process_jobs_from_email(self, jobs, message_id, email_processor):
         """Process all jobs from a single email and mark the email as processed if successful."""
@@ -427,22 +473,33 @@ class JobApplicationProcessor:
             # Generate the job ID
             job_id = self.job_details.generate_job_id(job['title'])
 
-            # Check if the job already exists in the database
-            existing_job = self.job_details.read_job(job_id)
-            if existing_job:
-                # Update the existing job with the new occurrence timestamp and increment the count
+            # Prepare data for insertion or update
+            job_data = {
+                'job_id': job_id,
+                'job_title': job['title'],
+                'job_description': job.get('description', ''),
+                'last_occurrence': datetime.now(),
+                'occurrence_count': 1
+            }
+
+            try:
+                # Attempt to insert the job data
+                self.job_details.insert_job(job_data)
+                self.logger.info(f"Inserted job '{job['title']}' into the database.")
+
+            except psycopg2.errors.UniqueViolation:
+                # Handle duplicate key error (job already exists)
+                existing_job = self.job_details.read_job(job_id)
                 updated_data = {
                     'last_occurrence': datetime.now(),
                     'occurrence_count': existing_job['occurrence_count'] + 1
                 }
                 self.job_details.update_job(job_id, updated_data)
-                self.logger.info(f"Updated job '{job['title']}' with new occurrence timestamp and count.")
-                continue
-            
-            # Process the job if it's not in the database
-            self.process_job(job)
+                self.logger.info(f"Updated existing job '{job['title']}' with new occurrence timestamp and count.")
 
-            
+            except Exception as e:
+                self.logger.error(f"Failed to process job '{job['title']}': {e}")
+        
 
 
 
@@ -466,13 +523,29 @@ class JobApplicationProcessor:
 
             gemini_results = {}
 
-            # Analyze the job and determine the time required
-            assumption_and_time = self.analyse_job_and_time(job['description'])
-            if not assumption_and_time:
-                self._store_job_details(job, gemini_results, "error_estimating_time")
-                self.logger.warning(f"Skipping job '{job['title']}' due to failure in estimating time.")
+            # Analyze if the job fits the freelancer's profile
+            job_fit = self.analyze_job_fit(job['description'], job['profile'])
+            if not job_fit or not job_fit['fit']:
+                self._store_job_details(job, gemini_results, "not_a_fit")
+                self.logger.info(f"Skipping job '{job['title']}' because it does not fit the freelancer's profile.")
                 return
-            gemini_results["analyse_job_and_time"] = assumption_and_time
+            gemini_results["analyze_job_fit"] = job_fit
+
+            # Generate detailed steps for the application
+            detailed_steps = self.get_detailed_steps(job['description'])
+            if not detailed_steps:
+                self._store_job_details(job, gemini_results, "error_generating_steps")
+                self.logger.error(f"Failed to generate detailed steps for job '{job['title']}'")
+                return
+            gemini_results["generate_detailed_steps"] = detailed_steps
+
+            # Summarize the analysis including assumptions and total estimated time
+            analysis_summary = self.summarize_analysis(detailed_steps)
+            if not analysis_summary:
+                self._store_job_details(job, gemini_results, "error_summarizing_analysis")
+                self.logger.error(f"Failed to summarize analysis for job '{job['title']}'")
+                return
+            gemini_results["summarize_analysis"] = analysis_summary
 
             # Parse the budget
             budget_info = self.parse_budget(job['budget'])
@@ -483,18 +556,10 @@ class JobApplicationProcessor:
             gemini_results["parse_budget"] = budget_info
 
             # Check if the budget is acceptable
-            if not self.is_budget_acceptable(assumption_and_time, budget_info):
+            if not self.is_budget_acceptable(analysis_summary, budget_info):
                 self._store_job_details(job, gemini_results, "budget_not_acceptable")
                 self.logger.info(f"Skipping job '{job['title']}' because the budget is not acceptable.")
                 return
-
-            # Analyze if the job fits the freelancer's profile
-            job_fit = self.analyze_job_fit(job['description'], job['profile'])
-            if not job_fit or not job_fit['fit']:
-                self._store_job_details(job, gemini_results, "not_a_fit")
-                self.logger.info(f"Skipping job '{job['title']}' because it does not fit the freelancer's profile.")
-                return
-            gemini_results["analyze_job_fit"] = job_fit
 
             # Generate the application letter
             application_letter = self.generate_application_letter(job['description'], job['profile'])
@@ -504,25 +569,20 @@ class JobApplicationProcessor:
                 return
             gemini_results["generate_application_letter"] = application_letter
 
-            # Generate detailed steps for the application
-            detailed_steps = self.get_detailed_steps(job['description'])
-            if not detailed_steps:
-                self._store_job_details(job, gemini_results, "error_generating_steps")
-                self.logger.error(f"Failed to generate detailed steps for job '{job['title']}'")
-                return
-            gemini_results["generate_detailed_steps"] = detailed_steps
-
             # Send the application email
             self.send_email(
-                job['title'], job['description'], assumption_and_time['estimated_time'],
-                assumption_and_time['assumptions'], job['budget'], application_letter, detailed_steps
+                job['title'], job['description'], analysis_summary['total_estimated_time'],
+                analysis_summary['assumptions'], job['budget'], application_letter, detailed_steps
             )
             self._store_job_details(job, gemini_results, "processed")
 
         except Exception as e:
-            error_details = traceback.format_exc()
-            self.logger.error(f"Failed to process job '{job['title']}': {e}\n{error_details}")
-            self._store_job_details(job, gemini_results, "error", {"error_details": error_details})
+            self.logger.error(f"Failed to process job: {e}")
+            self._store_job_details(job, gemini_results, "error", {e})
+
+        except Exception as e:
+            self.logger.error(f"Failed to process job: {e}")
+            self._store_job_details(job, gemini_results, "error", {e})
 
     def _store_job_details(self, job, gemini_results, status, performance_metrics=None):
         """Helper function to store job details in the database."""

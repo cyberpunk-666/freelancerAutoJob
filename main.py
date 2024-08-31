@@ -12,6 +12,8 @@ from job_details import JobDetails
 from postgres_db import PostgresDB
 from dotenv import load_dotenv
 import os
+from traceback_formatter import TracebackFormatter
+
 
 class MaxLengthFilter(logging.Filter):
     def __init__(self, max_length):
@@ -20,7 +22,7 @@ class MaxLengthFilter(logging.Filter):
 
     def filter(self, record):
         if len(record.msg) > self.max_length:
-            record.msg = record.msg[:self.max_length] + '...'
+            record.msg = record.msg[: self.max_length] + "..."
         return True
 
 
@@ -35,7 +37,7 @@ def init_database():
         "host": os.getenv("DB_HOST"),
         "database": os.getenv("DB_NAME"),
         "user": os.getenv("DB_USER"),
-        "password": os.getenv("DB_PASSWORD")
+        "password": os.getenv("DB_PASSWORD"),
     }
 
     logging.debug(f"Database configuration: {db_config}")
@@ -66,6 +68,7 @@ def init_database():
 
     return job_details
 
+
 def setup_logging(max_log_length=1000):
     """Setup logging with a single StreamHandler."""
     # Configure the root logger
@@ -77,7 +80,7 @@ def setup_logging(max_log_length=1000):
         logger.handlers.clear()
 
     # Setup the logging format
-    formatter = logging.Formatter(
+    formatter = TracebackFormatter(
         "%(asctime)s - %(threadName)s - %(levelname)s - %(message)s"
     )
 
@@ -95,18 +98,16 @@ def setup_logging(max_log_length=1000):
     return logger
 
 
-
-
-def main():   
+def main():
     # Setup logging with a maximum length for each log entry
-    logger = setup_logging(max_log_length=500)  
-    
+    logger = setup_logging(max_log_length=500)
+
     logger.info("Starting application.")
-    
+
     # Initialize the database and JobDetails
-    job_details = init_database()    
+    job_details = init_database()
     logging.info("Database initialized successfully.")
-            
+
     # Initialize the necessary components
     try:
         logger.info("Initializing the email sender.")
@@ -131,29 +132,49 @@ def main():
 
     try:
         logger.info("Initializing the job application processor.")
-        job_application_processor = JobApplicationProcessor(
-            email_sender, job_details
-        )
+        job_application_processor = JobApplicationProcessor(email_sender, job_details)
         logger.info("Job application processor initialized.")
     except Exception as e:
         logger.error(f"Failed to initialize JobApplicationProcessor: {e}")
         return
 
     logger.info("Starting to fetch and process jobs from emails.")
-
+    num_messages = 0
     try:
-        for jobs, message_id in email_processor.fetch_jobs():
-            logger.info(f"Processing jobs for email: {message_id}")
-            job_application_processor.process_jobs_from_email(
-                jobs, message_id, email_processor
-            )
-            logger.info(f"Finished processing jobs for email: {message_id}")
+        logger.info("Connecting to mailbox to retrieve the number of messages.")
+        email_processor.connect_to_mailbox()  # Connect once to get the number of messages
+        
+        num_messages = len(email_processor.mailbox.list()[1])  # Fetch the number of messages
+        logger.info(f"Number of messages in the mailbox: {num_messages}")
+        
+        email_processor.mailbox.quit()  # Close the connection after retrieving the number of messages
+        logger.info("Mailbox connection closed after retrieving the number of messages.")
     except Exception as e:
-        logger.error(f"An error occurred during email fetching and processing: {e}")
-        return
+        logger.error(f"Failed to retrieve the number of messages: {e}")
+        return  # or handle the error as needed
+
+    for i in range(num_messages - email_processor.num_messages_to_read + 1, num_messages + 1):
+        try:
+            logger.info(f"Connecting to mailbox to process email {i}.")
+            email_processor.connect_to_mailbox()  # Reconnect before processing each email
+            
+            logger.debug(f"Fetching and processing email {i}.")
+            email_processor.fetch_and_process_email(i, job_application_processor)
+            
+            logger.info(f"Successfully processed email {i}.")
+        except Exception as e:
+            logger.error(f"An error occurred while processing email {i}: {e}")
+        finally:
+            try:
+                if email_processor.mailbox:
+                    email_processor.mailbox.quit()  # Ensure the connection is closed after each email
+                    logger.info(f"Mailbox connection closed after processing email {i}.")
+            except Exception as e:
+                logger.error(f"Failed to close mailbox connection after processing email {i}: {e}")
+
+
 
     logger.info("Finished processing all emails.")
-
 
 
 if __name__ == "__main__":

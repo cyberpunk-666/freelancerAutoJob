@@ -16,3 +16,4 @@ python-dotenv
 selenium
 gunicorn
 psycopg2
+markdown

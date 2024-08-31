@@ -14,6 +14,8 @@ from utils import str_to_bool
 import threading
 import time
 from email.utils import parsedate_to_datetime
+import ssl
+from urllib.parse import urlparse, urlunparse
 
 class EmailProcessor:
     def __init__(self):
@@ -69,8 +71,12 @@ class EmailProcessor:
             return budget.text.strip()
         return None
 
+
     def process_message(self, message):
         logging.debug("Processing message from: %s", message['from'])
+        jobs = []  # Initialize an empty list to store jobs
+        seen_jobs = set()  # A set to track seen job links
+
         if self.target_sender in message['from']:
             payload = message.get_payload()
             if isinstance(payload, list):
@@ -80,40 +86,54 @@ class EmailProcessor:
                     links = self.extract_links_from_body(body)
                     if links:
                         for link in links:
-                            if link.startswith(self.job_link_prefix):
-                                logging.info("Found job link: %s", link)
-                                response = requests.get(link)
-                                logging.debug("Fetched response from job link: %s", response.text[:100])
-                                soup = BeautifulSoup(response.text, 'html.parser')
-                                job_description = self.extract_job_description(soup)
-                                job_title = self.extract_job_title(soup)
-                                job_budget = self.extract_budget(soup)
-                                if job_description is not None:
-                                    logging.info("Job found: %s", job_title)
+                            # Parse the link and remove query parameters
+                            parsed_url = urlparse(link)
+                            link_without_query = urlunparse(parsed_url._replace(query=""))
 
-                                    # Extract the email date
-                                    email_date = parsedate_to_datetime(message['Date'])
+                            if link_without_query.startswith(self.job_link_prefix):
+                                if link_without_query not in seen_jobs:
+                                    logging.info("Found job link: %s", link_without_query)
+                                    response = requests.get(link)
+                                    logging.debug("Fetched response from job link: %s", response.text[:100])
+                                    soup = BeautifulSoup(response.text, 'html.parser')
 
-                                    return {
-                                        'title': job_title,
-                                        'description': job_description,
-                                        'budget': job_budget,
-                                        'link': link,
-                                        'email_date': email_date
-                                    }
+                                    job_description = self.extract_job_description(soup)
+                                    job_title = self.extract_job_title(soup)
+                                    job_budget = self.extract_budget(soup)
+
+                                    if job_description is not None:
+                                        logging.info("Job found: %s", job_title)
+
+                                        # Extract the email date
+                                        email_date = parsedate_to_datetime(message['Date'])
+
+                                        # Append the job to the list
+                                        jobs.append({
+                                            'title': job_title,
+                                            'description': job_description,
+                                            'budget': job_budget,
+                                            'link': link_without_query,  # Store the link without query parameters
+                                            'email_date': email_date
+                                        })
+                                else:
+                                    logging.debug("Link has already been processed: %s", link_without_query)
                             else:
-                                logging.debug("Link does not start with job link prefix: %s", link)
+                                logging.debug("Link does not start with job link prefix: %s", link_without_query)
+
+                            # Add the link to seen jobs
+                            seen_jobs.add(link_without_query)
                     else:
                         logging.debug("No links found in message body.")
-        else:
-            logging.debug("Message not from target sender: %s", message['from'])
-            
-        return None
+            else:
+                logging.debug("Message not from target sender: %s", message['from'])
+
+        return jobs  # Return the list of jobs
 
 
-    def fetch_email(self, index, max_retries=3):
+    def fetch_email(self, index, max_retries=6):
         logging.debug("Fetching email %d", index)
         retries = 0
+        
         while retries < max_retries:
             try:
                 retr_result = self.mailbox.retr(index)
@@ -126,55 +146,57 @@ class EmailProcessor:
                     logging.debug("Skipping already processed email: %s", message_id)
                     return None
 
-                job = self.process_message(message)
-                if job:
+                jobs = self.process_message(message)  # Now returns a list of jobs
+                if jobs:
                     self.processed_emails.append(message_id)  # Track processed email ID
-                    return job, message_id
+                    return jobs, message_id  # Return list of jobs and the message ID
                 else:
-                    logging.debug("No job found in email %d. Moving to the next email.", index)
+                    logging.debug("No jobs found in email %d. Moving to the next email.", index)
                     return None  # No retry needed, just move to the next email
 
-            except poplib.error_proto as e:
-                logging.error(f"Failed to retrieve message {index}: {e}")
+            except ssl.SSLError as e:
                 retries += 1
-                wait_time = 2 ** retries  # Exponential backoff
-                logging.warning(f"Retrying to fetch email {index} in {wait_time} seconds (Attempt {retries}/{max_retries}).")
-                time.sleep(wait_time)
+                logging.error(f"SSL error occurred while fetching email {index}: {e}")
+                if retries < max_retries:
+                    wait_time = 2 ** retries  # Exponential backoff
+                    logging.info(f"Retrying to fetch email {index} in {wait_time} seconds ({retries}/{max_retries})...")
+                    time.sleep(wait_time)
+                    continue  # Retry fetching the email
+                else:
+                    logging.error(f"Failed to fetch email {index} after {max_retries} attempts due to SSL error.")
+                    return None
+
             except Exception as e:
                 logging.error(f"An unexpected error occurred while fetching email {index}: {e}")
-                break  # Exit loop on unexpected errors
+                return None
 
-        logging.error(f"Exceeded maximum retries for email {index}.")
+        logging.error(f"Failed to fetch email {index} after {max_retries} attempts.")
         return None
-    
 
-    def fetch_jobs(self):
-        logging.debug("Fetching jobs")
-        self.connect_to_mailbox()
-        num_messages = len(self.mailbox.list()[1])
-        num_messages_to_read = min(self.num_messages_to_read, num_messages)
-        jobs = []
 
-        for i in range(num_messages - num_messages_to_read + 1, num_messages + 1):
-            result = self.fetch_email(i)
-            if result:
-                job, message_id = result
-                jobs.append(job)
-                yield jobs, message_id  # Yield jobs and the corresponding message ID
+    def fetch_and_process_email(self, index, job_application_processor):
+        logging.debug(f"Fetching and processing email {index}")
+        result = self.fetch_email(index)
+        if result:
+            jobs, message_id = result
+            self.process_email_jobs(jobs, message_id, job_application_processor)
+        else:
+            logging.warning(f"Skipping email {index} due to errors or no jobs found.")
 
-        try:
-            self.mailbox.quit()
-        except poplib.error_proto as e:
-            logging.error(f"Failed to quit mailbox: {e}")
-
-        logging.info("Finished fetching jobs")
+    def process_email_jobs(self, jobs, message_id, job_application_processor):
+        for job in jobs:
+            try:
+                job_application_processor.process_job(job)
+            except Exception as e:
+                logging.error(f"Failed to process job: {job['title']} from email {message_id}: {e}")
+        self.mark_email_as_processed(message_id)
 
     def load_processed_emails(self, filename='processed_emails.json'):
         if os.path.exists(filename):
             with open(filename, 'r') as file:
                 return json.load(file)
         return []
-    
+
     def save_processed_emails(self, email_ids, filename='processed_emails.json'):
         with open(filename, 'w') as file:
             json.dump(email_ids, file)
