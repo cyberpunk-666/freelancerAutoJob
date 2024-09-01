@@ -18,7 +18,8 @@ import ssl
 from urllib.parse import urlparse, urlunparse
 
 class EmailProcessor:
-    def __init__(self):
+    def __init__(self, processed_emails):
+        self.processed_emails = processed_emails
         self.username = os.getenv('EMAIL_USERNAME')
         self.password = os.getenv('EMAIL_PASSWORD')
         self.pop3_server = os.getenv('POP3_SERVER')
@@ -29,7 +30,6 @@ class EmailProcessor:
         self.job_description_classes = os.getenv('JOB_DESCRIPTION_CLASSES').split(',')
         self.min_hourly_rate = float(os.getenv('MIN_HOURLY_RATE'))
         self.lock = threading.Lock()
-        self.processed_emails = self.load_processed_emails()
         self.mailbox = None
 
     def connect_to_mailbox(self):
@@ -129,11 +129,10 @@ class EmailProcessor:
 
         return jobs  # Return the list of jobs
 
-
-    def fetch_email(self, index, max_retries=6):
+    def fetch_email(self, index, max_retries=3):
         logging.debug("Fetching email %d", index)
         retries = 0
-        
+
         while retries < max_retries:
             try:
                 retr_result = self.mailbox.retr(index)
@@ -142,17 +141,19 @@ class EmailProcessor:
                 message = parser.Parser().parsestr(msg_content)
                 message_id = message['message-id']
 
-                if message_id in self.processed_emails:
-                    logging.debug("Skipping already processed email: %s", message_id)
+                # Check if the email has already been processed
+                if self.is_email_processed(message_id):
+                    logging.debug(f"Skipping already processed email: {message_id}")
                     return None
 
                 jobs = self.process_message(message)  # Now returns a list of jobs
                 if jobs:
-                    self.processed_emails.append(message_id)  # Track processed email ID
-                    return jobs, message_id  # Return list of jobs and the message ID
+                    # Add the message ID to processed emails
+                    self.mark_email_as_processed(message_id)
+                    return jobs, message_id
                 else:
-                    logging.debug("No jobs found in email %d. Moving to the next email.", index)
-                    return None  # No retry needed, just move to the next email
+                    logging.debug(f"No jobs found in email {index}. Moving to the next email.")
+                    return None
 
             except ssl.SSLError as e:
                 retries += 1
@@ -161,7 +162,7 @@ class EmailProcessor:
                     wait_time = 2 ** retries  # Exponential backoff
                     logging.info(f"Retrying to fetch email {index} in {wait_time} seconds ({retries}/{max_retries})...")
                     time.sleep(wait_time)
-                    continue  # Retry fetching the email
+                    continue
                 else:
                     logging.error(f"Failed to fetch email {index} after {max_retries} attempts due to SSL error.")
                     return None
@@ -172,6 +173,7 @@ class EmailProcessor:
 
         logging.error(f"Failed to fetch email {index} after {max_retries} attempts.")
         return None
+
 
 
     def fetch_and_process_email(self, index, job_application_processor):
@@ -191,16 +193,13 @@ class EmailProcessor:
                 logging.error(f"Failed to process job: {job['title']} from email {message_id}: {e}")
         self.mark_email_as_processed(message_id)
 
-    def load_processed_emails(self, filename='processed_emails.json'):
-        if os.path.exists(filename):
-            with open(filename, 'r') as file:
-                return json.load(file)
-        return []
-
-    def save_processed_emails(self, email_ids, filename='processed_emails.json'):
-        with open(filename, 'w') as file:
-            json.dump(email_ids, file)
-
     def mark_email_as_processed(self, message_id):
-        self.save_processed_emails(self.processed_emails)
+        self.processed_emails.mark_email_as_processed(message_id)
         logging.info(f"Marked email as processed: {message_id}")
+
+    def is_email_processed(self, message_id):
+        return self.processed_emails.is_email_processed(message_id)
+
+    def load_processed_emails(self):
+        return self.processed_emails.load_all_processed_emails()
+

@@ -501,8 +501,6 @@ class JobApplicationProcessor:
                 self.logger.error(f"Failed to process job '{job['title']}': {e}")
         
 
-
-
     def load_profile(self):
         """Load the profile.txt content."""
         profile_path = 'profile.txt'
@@ -517,7 +515,12 @@ class JobApplicationProcessor:
         """Process a single job by analyzing, preparing an application letter, and sending an email."""
         try:
             self.logger.info(f"Processing job: {job['title']}")
-
+            
+            # Check if the job already exists in the database
+            if self.job_details.job_exists(job['title']):
+                self.logger.info(f"Job '{job['title']}' already exists in the database. Skipping processing.")
+                return
+            
             # Load the profile.txt content
             job['profile'] = self.load_profile()
 
@@ -525,35 +528,35 @@ class JobApplicationProcessor:
 
             # Analyze if the job fits the freelancer's profile
             job_fit = self.analyze_job_fit(job['description'], job['profile'])
+            gemini_results["analyze_job_fit"] = job_fit
             if not job_fit or not job_fit['fit']:
                 self._store_job_details(job, gemini_results, "not_a_fit")
                 self.logger.info(f"Skipping job '{job['title']}' because it does not fit the freelancer's profile.")
                 return
-            gemini_results["analyze_job_fit"] = job_fit
 
             # Generate detailed steps for the application
             detailed_steps = self.get_detailed_steps(job['description'])
+            gemini_results["generate_detailed_steps"] = detailed_steps
             if not detailed_steps:
                 self._store_job_details(job, gemini_results, "error_generating_steps")
                 self.logger.error(f"Failed to generate detailed steps for job '{job['title']}'")
                 return
-            gemini_results["generate_detailed_steps"] = detailed_steps
 
             # Summarize the analysis including assumptions and total estimated time
             analysis_summary = self.summarize_analysis(detailed_steps)
+            gemini_results["summarize_analysis"] = analysis_summary
             if not analysis_summary:
                 self._store_job_details(job, gemini_results, "error_summarizing_analysis")
                 self.logger.error(f"Failed to summarize analysis for job '{job['title']}'")
                 return
-            gemini_results["summarize_analysis"] = analysis_summary
 
             # Parse the budget
             budget_info = self.parse_budget(job['budget'])
+            gemini_results["parse_budget"] = budget_info
             if not budget_info:
                 self._store_job_details(job, gemini_results, "invalid_budget_information")
                 self.logger.warning(f"Skipping job '{job['title']}' due to invalid budget information.")
                 return
-            gemini_results["parse_budget"] = budget_info
 
             # Check if the budget is acceptable
             if not self.is_budget_acceptable(analysis_summary, budget_info):
@@ -563,11 +566,11 @@ class JobApplicationProcessor:
 
             # Generate the application letter
             application_letter = self.generate_application_letter(job['description'], job['profile'])
+            gemini_results["generate_application_letter"] = application_letter
             if not application_letter:
                 self._store_job_details(job, gemini_results, "error_generating_letter")
                 self.logger.error(f"Failed to generate application letter for job '{job['title']}'")
                 return
-            gemini_results["generate_application_letter"] = application_letter
 
             # Send the application email
             self.send_email(

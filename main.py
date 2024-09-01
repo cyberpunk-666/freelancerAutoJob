@@ -13,6 +13,7 @@ from postgres_db import PostgresDB
 from dotenv import load_dotenv
 import os
 from traceback_formatter import TracebackFormatter
+from processed_email import ProcessedEmails
 
 
 class MaxLengthFilter(logging.Filter):
@@ -66,7 +67,22 @@ def init_database():
         logging.error(f"Failed to create job_details table: {e}")
         raise
 
-    return job_details
+    try:
+        processed_emails = ProcessedEmails(db)
+        logging.info("ProcessedEmails instance created successfully.")
+    except Exception as e:
+        logging.error(f"Failed to create ProcessedEmails instance: {e}")
+        raise
+    
+    try:
+        processed_emails.create_table()
+        logging.info("processed_emails table ensured to exist.")
+    except Exception as e:
+        logging.error(f"Failed to create processed_emails table: {e}")
+        raise
+
+    
+    return job_details, processed_emails
 
 
 def setup_logging(max_log_length=1000):
@@ -105,7 +121,7 @@ def main():
     logger.info("Starting application.")
 
     # Initialize the database and JobDetails
-    job_details = init_database()
+    job_details, processed_emails  = init_database()
     logging.info("Database initialized successfully.")
 
     # Initialize the necessary components
@@ -124,7 +140,7 @@ def main():
 
     try:
         logger.info("Initializing the email processor.")
-        email_processor = EmailProcessor()
+        email_processor = EmailProcessor(processed_emails)
         logger.info("Email processor initialized.")
     except Exception as e:
         logger.error(f"Failed to initialize EmailProcessor: {e}")
