@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from postgres_db import PostgresDB
+from app.db.postgresdb import PostgresDB
 import logging
 
 class ProcessedEmails:

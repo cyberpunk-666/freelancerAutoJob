@@ -17,31 +17,9 @@ class JobApplicationProcessor:
         self.email_sender = email_sender
         self.logger = logging.getLogger(__name__)
         self.api_key = os.getenv('GEMINI_API_KEY')
-        self.use_gpt_cache = str_to_bool(os.getenv('USE_GPT_CACHE', 'true'))
-        self.cache = self.load_cache() if self.use_gpt_cache else {}
+
         self.last_api_call_time = 0
         self.logger.info("JobApplicationProcessor initialized.")
-
-    def load_cache(self):
-        """Load the GPT response cache from a file if it exists."""
-        if os.path.exists("cache.json"):
-            try:
-                with open("cache.json", 'r') as file:
-                    cache = json.load(file)
-                self.logger.info('Cache loaded from file.')
-                return cache
-            except Exception as e:
-                self.logger.error(f'Failed to load cache from file: {e}')
-        return {}
-
-    def save_cache(self):
-        """Save the GPT response cache to a file."""
-        try:
-            with open("cache.json", 'w') as file:
-                json.dump(self.cache, file)
-            self.logger.info('Cache saved to file.')
-        except Exception as e:
-            self.logger.error(f'Failed to save cache to file: {e}')
 
     def extract_json_string(self, input_string):
         """Extract a JSON string from a larger text string."""
@@ -84,13 +62,6 @@ class JobApplicationProcessor:
         """Send a prompt to the Gemini model and return the response based on the provided schema."""
         self.delay_if_necessary()  # Ensure rate limiting
 
-        # self.logger.info(f'Sending prompt to Gemini: {prompt}')
-        cache_key = hashlib.md5(f'{prompt}'.encode()).hexdigest()
-
-        if self.use_gpt_cache and cache_key in self.cache:
-            self.logger.info(f'Using cached response for prompt: {prompt}')
-            return self.cache[cache_key]
-
         retries = 0
         wait_time = 10
         while retries < max_retries:
@@ -128,10 +99,6 @@ class JobApplicationProcessor:
                 # Adapt this part based on your response schema
                 response_str = response_data['candidates'][0]['content']['parts'][0]['text'].strip()
                 self.logger.info(f'Gemini response received: {response_str}')
-
-                if self.use_gpt_cache and "ERROR" not in response_str:
-                    self.cache[cache_key] = response_str
-                    self.save_cache()
 
                 return response_str
 

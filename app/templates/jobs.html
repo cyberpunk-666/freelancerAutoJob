@@ -1,0 +1,33 @@
+{% extends "layout.html" %}
+
+{% block title %}job Dashboard{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Job Listings</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Budget</th>z
+                <th>Email Date</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in jobs %}
+            <tr>
+                <td>
+                    <a href="{{ url_for('jobs.job_detail', job_id=job[0]) }}">
+                        {{ job[1] }}
+                    </a>
+                </td>
+                <td>{{ job[3] }}</td>
+                <td>{{ job[4] }}</td>
+                <td>{{ job[6] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,6 +1,6 @@
 from flask import Flask, render_template
 from job_details import JobDetails
-from postgres_db import PostgresDB
+from app.db.postgresdb import PostgresDB
 from datetime import datetime
 import os
 from dotenv import load_dotenv
@@ -30,7 +30,7 @@ def index():
     """Display all job entries."""
     conn = db
     jobs = job_details.db.fetch_all('SELECT * FROM job_details ORDER BY email_date DESC')
-    return render_template('index.html', jobs=jobs)
+    return render_template('jobs.html', jobs=jobs)
 
 @app.route('/job/<job_id>')
 def job_detail(job_id):

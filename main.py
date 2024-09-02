@@ -9,7 +9,7 @@ from email_processor import EmailProcessor
 from job_application_processor import JobApplicationProcessor
 from email_sender import EmailSender
 from job_details import JobDetails
-from postgres_db import PostgresDB
+from app.db.postgresdb import PostgresDB
 from dotenv import load_dotenv
 import os
 from traceback_formatter import TracebackFormatter

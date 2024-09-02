@@ -17,3 +17,4 @@ selenium
 gunicorn
 psycopg2
 markdown
+flask_wtf
