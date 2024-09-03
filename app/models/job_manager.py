@@ -1,6 +1,7 @@
 import json
 import hashlib
 from datetime import datetime
+import logging
 from app.db.postgresdb import PostgresDB
 
 class JobManager:
@@ -9,6 +10,7 @@ class JobManager:
         Initialize the JobManager class with a PostgresDB instance.
         :param db: An instance of the PostgresDB class for database operations.
         """
+        self.logger = logging.getLogger(__name__)
         self.db = db
 
     def generate_job_id(self, job_title: str) -> str:
@@ -28,6 +30,7 @@ class JobManager:
         :param performance_metrics: JSON data with performance metrics (optional).
         :return: The job_id of the created job.
         """
+        self.logger.info(f"Creating new job: {job_title}")
         job_id = self.generate_job_id(job_title)
         data = {
             'job_id': job_id,
@@ -40,11 +43,13 @@ class JobManager:
             'performance_metrics': json.dumps(performance_metrics or {})
         }
         self.db.add_object('job_details', data)
+        self.logger.info(f"Job created successfully with ID: {job_id}")
         return job_id
 
     def read_job(self, job_id: str) -> dict:
         """Read a job entry from the job_details table."""
         query = "SELECT * FROM job_details WHERE job_id = %s"
+        self.logger.info(f"Fetching job with ID: {job_id}")
         result = self.db.fetch_one(query, (job_id,))
         if result:
             job_details = {
@@ -59,7 +64,9 @@ class JobManager:
                 'last_occurrence': result[8],
                 'occurrence_count': result[9]
             }
+            self.logger.info(f"Job found: {job_id}")
             return job_details
+        self.logger.warning(f"Job not found: {job_id}")
         return None
 
     def update_job(self, job_id: str, data: dict):
@@ -68,14 +75,18 @@ class JobManager:
         :param job_id: The unique ID of the job.
         :param data: A dictionary containing the columns to update and their new values.
         """
+        self.logger.info(f"Updating job: {job_id}")
         self.db.update_object('job_details', data, {'job_id': job_id})
+        self.logger.info(f"Job updated successfully: {job_id}")
 
     def delete_job(self, job_id: str):
         """
         Delete a job entry from the job_details table.
         :param job_id: The unique ID of the job.
         """
+        self.logger.info(f"Deleting job: {job_id}")
         self.db.delete_object('job_details', {'job_id': job_id})
+        self.logger.info(f"Job deleted successfully: {job_id}")
 
     def job_exists(self, job_title: str) -> bool:
         """
@@ -84,6 +95,7 @@ class JobManager:
         :return: True if the job exists, False otherwise.
         """
         job_id = self.generate_job_id(job_title)
+        self.logger.info(f"Checking if job exists: {job_title}")
         result = self.db.fetch_one("SELECT job_id FROM job_details WHERE job_id = %s", (job_id,))
         return result is not None
     
@@ -93,6 +105,7 @@ class JobManager:
         :return: A list of dictionaries, each containing a job's details.
         """
         query = "SELECT * FROM job_details"
+        self.logger.info("Fetching all jobs")
         results = self.db.fetch_all("SELECT * FROM job_details")
         jobs = []
         for result in results:
@@ -110,9 +123,10 @@ class JobManager:
             }
             jobs.append(job)
         return jobs
-    
+
     def create_table(self):
         """Create the job_details table if it doesn't exist."""
+        self.logger.info("Creating job_details table")
         create_table_query = """
         CREATE TABLE IF NOT EXISTS job_details (
             job_id VARCHAR(32) PRIMARY KEY,
@@ -128,3 +142,4 @@ class JobManager:
         );
         """
         self.db.create_table(create_table_query)
+        self.logger.info("job_details table created successfully")

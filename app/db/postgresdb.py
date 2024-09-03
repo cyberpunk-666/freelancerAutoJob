@@ -7,14 +7,16 @@ class PostgresDB:
         self.database = database
         self.user = user
         self.password = password
-        self.connection = None
         self.logger = logging.getLogger(__name__)
+        self.connection = None
+        self.logger.info("PostgresDB instance initialized")
         self.init_database()
         self.connect()
 
     def init_database(self):
         """Check if the database exists, and create it if it does not."""
         try:
+            self.logger.info(f"Checking if database '{self.database}' exists")
             # Connect to the PostgreSQL server (without specifying a database)
             conn = psycopg2.connect(
                 host=self.host,
@@ -29,6 +31,7 @@ class PostgresDB:
                 exists = cursor.fetchone()
                 if not exists:
                     # Create the database if it does not exist
+                    self.logger.info(f"Creating database '{self.database}'")
                     cursor.execute(f'CREATE DATABASE "{self.database}"')
                     self.logger.info(f"Database '{self.database}' created successfully.")
                 else:
@@ -41,6 +44,7 @@ class PostgresDB:
     def connect(self):
         """Establish a connection to the PostgreSQL database."""
         try:
+            self.logger.info(f"Connecting to database '{self.database}'")
             self.connection = psycopg2.connect(
                 host=self.host,
                 database=self.database,

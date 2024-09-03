@@ -144,6 +144,11 @@ class JobApplicationProcessor:
         }
 
         response_text = self.send_to_gemini(prompt, response_schema)
+        """AI is creating summary for parse_budget
+
+        Returns:
+            [type]: [description]
+        """
         if response_text:
             try:
                 json_str = self.extract_json_string(response_text)

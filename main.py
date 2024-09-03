@@ -12,7 +12,7 @@ from job_details import JobDetails
 from app.db.postgresdb import PostgresDB
 from dotenv import load_dotenv
 import os
-from traceback_formatter import TracebackFormatter
+from app.utils.traceback_formatter import TracebackFormatter
 from processed_email import ProcessedEmails
 
 
@@ -65,6 +65,14 @@ def init_database():
         logging.info("job_details table ensured to exist.")
     except Exception as e:
         logging.error(f"Failed to create job_details table: {e}")
+        raise
+    
+    # create user table
+    try:
+        job_details.create_user_table()
+        logging.info("user table ensured to exist.")
+    except Exception as e:
+        logging.error(f"Failed to create user table: {e}")
         raise
 
     try:
