@@ -4,3 +4,5 @@ jobs.json
 processed_emails.json
 .env
 config.cfg
+cert.pem
+key.pem

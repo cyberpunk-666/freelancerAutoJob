@@ -12,8 +12,10 @@ class JobDetails:
         self.db = db
 
     def generate_job_id(self, job_title):
-        """Generate a unique job ID using the MD5 hash of the job title."""
-        return hashlib.md5(job_title.encode('utf-8')).hexdigest()
+        """Generate a unique job ID using the hash of the job title."""
+        job_title = job_title.encode('utf-8')
+        job_id = hashlib.sha256(job_title).hexdigest()
+        return job_id
 
     def create_job(self, job_title, job_description, budget, email_date, gemini_results, status, performance_metrics):
         """

@@ -1,21 +1,21 @@
 from flask import Flask
 from app.config.config import Config
 from app.db.postgresdb import PostgresDB
-from flask import redirect, url_for
+from flask import redirect, url_for, current_app
 from app.db.utils import close_db
 import logging
-from flask_login import LoginManager
+from flask_login import LoginManager, login_required, current_user
 from dotenv import load_dotenv
 import os
 from app.models.job_manager import JobManager
 from app.models.user_manager import UserManager
 from app.models.processed_email_manager import ProcessedEmailManager
 from app.db.utils import get_db
-from app.models.user_manager import UserManager
-from app.db.postgresdb import PostgresDB
-from flask_login import LoginManager
 
 login_manager = LoginManager()
+login_manager.login_view = 'user.login'
+login_manager.login_message_category = 'info'
+login_manager.login_message = 'Please log in to access this page.'
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -103,7 +103,6 @@ def create_app():
     """Create and configure the Flask application."""
     app = Flask(__name__)
     app.config['SECRET_KEY'] = 'RQaMw8Oy5Cch7Po9ANAnHud1r-MedSNduol_qFha44Y'
-    app.config.from_object(Config)
 
     # Initialize the LoginManager with the app
     login_manager.init_app(app)

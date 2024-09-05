@@ -16,7 +16,7 @@ class JobApplicationProcessor:
         self.job_details = job_details
         self.email_sender = email_sender
         self.logger = logging.getLogger(__name__)
-        self.api_key = os.getenv('GEMINI_API_KEY')
+        self.api_key = os.getenv('GEMINI_API_KEY', '')
 
         self.last_api_call_time = 0
         self.logger.info("JobApplicationProcessor initialized.")

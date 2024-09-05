@@ -156,10 +156,10 @@ if __name__ == "__main__":
 
     # Database configuration
     db_config = {
-        "host": "localhost",
-        "database": "test",
-        "user": "postgres",
-        "password": "tdk2hdD!"
+        "host": os.getenv("DB_HOST", "localhost"),
+        "database": os.getenv("DB_NAME", "test"),
+        "user": os.getenv("DB_USER", "postgres"),
+        "password": os.getenv("DB_PASSWORD")
     }
 
     # Initialize the database

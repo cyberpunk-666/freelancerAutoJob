@@ -20,3 +20,6 @@ markdown
 flask_wtf
 email-validator
 flask_login
+flask_talisman
+flask_limiter
+bcrypt

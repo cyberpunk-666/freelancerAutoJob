@@ -1,13 +1,19 @@
 import hashlib
 import hmac
 import os
+import re
 from datetime import datetime
 import logging
 from app.models.user import User
 from flask_login import UserMixin
+from flask import url_for, render_template
+from app.utils.email_sender import EmailSender
+import secrets
+import bcrypt
 class UserManager(UserMixin):
     def __init__(self, db):
         self.db = db
+        self.email_sender = EmailSender()
         self.logger = logging.getLogger(__name__)
 
     def create_table(self):
@@ -18,6 +24,8 @@ class UserManager(UserMixin):
             user_id SERIAL PRIMARY KEY,
             email VARCHAR(255) UNIQUE NOT NULL,
             password_hash VARCHAR(255) NOT NULL,
+            verification_token VARCHAR(64),  -- Add the verification_token column
+            email_verified BOOLEAN DEFAULT FALSE, -- Add email verification status
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             is_active BOOLEAN DEFAULT TRUE
         );
@@ -26,33 +34,56 @@ class UserManager(UserMixin):
         self.logger.info("Users table created successfully")
 
 
+
     def hash_password(self, password):
         """Hash a password for storing."""
-        salt = os.urandom(16)
-        pwdhash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
-        return salt + pwdhash
+        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
-        self.logger.info(f"Attempting to sign up user: {email}")
     def verify_password(self, stored_password, provided_password):
         """Verify a stored password against one provided by user."""
-        salt = stored_password[:16]
-        stored_pwdhash = stored_password[16:]
-        pwdhash = hashlib.pbkdf2_hmac('sha256', provided_password.encode('utf-8'), salt, 100000)
-        return hmac.compare_digest(stored_pwdhash, pwdhash)
+        return bcrypt.checkpw(provided_password.encode('utf-8'), stored_password)
+
 
     def sign_up(self, email, password):
         """Create a new user account with a hashed password."""
         password_hash = self.hash_password(password)
+        verification_token = secrets.token_urlsafe(32)  # Generate a unique token for email verification
         try:
+            # Insert user into the database
             self.db.execute_query(
-                "INSERT INTO users (email, password_hash) VALUES (%s, %s)",
-                (email, password_hash.hex())
+                "INSERT INTO users (email, password_hash, verification_token) VALUES (%s, %s, %s)",
+                (email, password_hash.hex(), verification_token)
             )
-            self.logger.info(f"User signed up successfully: {email}")
-            return True
+
+            # Generate the verification link
+            verification_link = url_for('user.verify_email', token=verification_token, _external=True)
+
+            # Load the HTML email template and replace placeholders
+            email_html = render_template(
+                'app/models/processed_email_manager.py',  # Assuming the template is in templates/email/verification_email.html
+                user_name=email,  # Replace with actual user's name if available
+                verification_link=verification_link
+            )
+
+            # Send the email using the email sender utility
+            email_sent = self.email_sender.send_email(
+                to=email,
+                subject="Verify your email",
+                html_body=email_html  # Send the HTML content
+            )
+
+            if email_sent:
+                self.logger.info(f"User signed up successfully and verification email sent: {email}")
+                return True
+            else:
+                self.logger.error(f"User signed up but failed to send verification email: {email}")
+                return False
+
         except Exception as e:
             self.logger.error(f"Sign up failed for {email}: {str(e)}", exc_info=True)
             return False
+
+
 
     def login(self, email, password):
         """Authenticate a user based on email, password, and active status."""
@@ -161,4 +192,54 @@ class UserManager(UserMixin):
             return True
         except Exception as e:
             self.logger.error(f"Failed to delete user {user_id}: {str(e)}", exc_info=True)
+            return False
+
+    def check_password(self, user_id, password):
+        """Check if the provided password matches the user's password."""
+        self.logger.info(f"Checking password for user with ID {user_id}")
+        query = "SELECT password_hash FROM users WHERE user_id = %s"
+        result = self.db.fetch_one(query, (user_id, ))
+        if result:
+            stored_password_hash = result[0]
+            if self.verify_password(bytes.fromhex(stored_password_hash), password):
+                self.logger.info(f"Password match for user with ID {user_id}")
+                return True
+            else:
+                self.logger.warning(f"Password mismatch for user with ID {user_id}")
+                return False
+        else:
+            self.logger.warning(f"User with ID {user_id} not found")
+            return False
+
+    def update_password(self, user_id, new_password):
+        """Update a user's password."""
+        self.logger.info(f"Updating password for user with ID {user_id}")
+        password_hash = self.hash_password(new_password)
+        try:
+            self.db.execute_query(
+                "UPDATE users SET password_hash = %s WHERE user_id = %s",
+                (password_hash.hex(), user_id)
+            )
+            self.logger.info(f"Password updated successfully for user with ID {user_id}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to update password for user {user_id}: {str(e)}", exc_info=True)
+            return False
+
+    def verify_email(self, email, token):
+        """Verify user's email using the provided token."""
+        try:
+            result = self.db.fetch_one(
+                "SELECT user_id FROM users WHERE email = %s AND verification_token = %s",
+                (email, token)
+            )
+            if result:
+                self.db.execute_query("UPDATE users SET email_verified = TRUE, verification_token = NULL WHERE user_id = %s", (result[0],))
+                self.logger.info(f"Email verified successfully for user: {email}")
+                return True
+            else:
+                self.logger.warning(f"Invalid verification attempt for email: {email}")
+                return False
+        except Exception as e:
+            self.logger.error(f"Email verification failed for {email}: {str(e)}", exc_info=True)
             return False
