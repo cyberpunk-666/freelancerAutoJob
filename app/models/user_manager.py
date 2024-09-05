@@ -243,3 +243,21 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Email verification failed for {email}: {str(e)}", exc_info=True)
             return False
+
+    def get_or_create_user_by_google_id(self, google_id, email):
+        """Get or create a user by Google ID."""
+        try:
+            result = self.db.fetch_one(
+                "SELECT * FROM users WHERE google_id = %s", (google_id,)
+            )
+            if result:
+                return User(*result)
+            else:
+                self.db.execute_query(
+                    "INSERT INTO users (google_id, email, email_verified) VALUES (%s, %s, TRUE)",
+                    (google_id, email)
+                )
+                return self.get_user_by_email(email)
+        except Exception as e:
+            self.logger.error(f"Error getting or creating user by Google ID: {str(e)}", exc_info=True)
+            return None

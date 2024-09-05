@@ -1,3 +1,5 @@
+from flask_dance.contrib.google import make_google_blueprint
+from flask_dance.contrib.google import google
 from flask import Flask
 from app.config.config import Config
 from app.db.postgresdb import PostgresDB
@@ -99,10 +101,16 @@ def init_database():
     user_manager.create_table()
     logging.info("Database initialized and tables created successfully.")
 
+google_bp = make_google_blueprint(
+    client_id="my-key-here",
+    client_secret="my-secret-here",
+    scope=["profile", "email"]
+)
+
 def create_app():
     """Create and configure the Flask application."""
     app = Flask(__name__)
-    app.config['SECRET_KEY'] = 'RQaMw8Oy5Cch7Po9ANAnHud1r-MedSNduol_qFha44Y'
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
     # Initialize the LoginManager with the app
     login_manager.init_app(app)
@@ -114,6 +122,7 @@ def create_app():
 
     app.register_blueprint(user_bp, url_prefix='/user')
     app.register_blueprint(job_bp, url_prefix='/jobs')
+    app.register_blueprint(google_bp, url_prefix='/login')
 
     # Teardown database connection
     app.teardown_appcontext(close_db)

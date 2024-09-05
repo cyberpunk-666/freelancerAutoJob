@@ -50,4 +50,6 @@ class Config:
     DB_HOST = os.getenv('DB_HOST')
     DB_NAME = os.getenv('DB_NAME')
     DB_USER = os.getenv('DB_USER')
+    GOOGLE_OAUTH_CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID')
+    GOOGLE_OAUTH_CLIENT_SECRET = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
     DB_PASSWORD = os.getenv('DB_PASSWORD')

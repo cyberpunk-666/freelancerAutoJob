@@ -1,3 +1,5 @@
+from flask_dance.contrib.google import google
+from flask import flash
 from flask import Blueprint, render_template, redirect, url_for, flash, session, request, session
 from flask_login import login_user, logout_user
 from app.user.forms import RegistrationForm, LoginForm, ResetPasswordForm
@@ -110,3 +112,26 @@ def reset_password():
         else:
             flash('Password reset failed. Please try again.', 'danger')
     return render_template('reset_password.html', form=form)
+
+@user_bp.route('/google-login')
+def google_login():
+    if not google.authorized:
+        return redirect(url_for('google.login'))
+    resp = google.get('/oauth2/v1/userinfo')
+    if resp.ok:
+        user_info = resp.json()
+        google_id = user_info['id']
+        email = user_info['email']
+        db = get_db()
+        user_manager = UserManager(db)
+        user = user_manager.get_or_create_user_by_google_id(google_id, email)
+        if user:
+            login_user(user)
+            flash('Logged in successfully via Google.', 'success')
+            return redirect(url_for('jobs.index'))
+        else:
+            flash('Failed to log in via Google. Please try again.', 'danger')
+            return redirect(url_for('user.login'))
+    else:
+        flash('Failed to get user info from Google.', 'danger')
+        return redirect(url_for('user.login'))
