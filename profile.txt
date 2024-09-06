@@ -1,6 +1,6 @@
 With a rich history of 35 years in coding, which began when I was just 10 years old, I have cultivated a deep passion for technology and programming. My journey as a self-learner and DIY enthusiast has equipped me with a diverse skill set and an unyielding drive to explore and master various programming languages and technologies.
 
-Throughout my career, I have demonstrated my ability to adapt and excel in different programming environments. I am proficient in several programming languages, including Python, C++, C#.net, Visual Basic .net, HTML, JavaScript, ASP / ASP.net. My experience spans across various roles and projects, from web programming and enterprise solutions to 3D engine and gaming, technical support and 3D CAD drawing.
+Throughout my career, I have demonstrated my ability to adapt and excel in different programming environments. I am proficient in several programming languages, including Python, C++, C#.net, Visual Basic .net, HTML, JavaScript, Nodejs, ASP / ASP.net. My experience spans across various roles and projects, from web programming and enterprise solutions to 3D engine and gaming, technical support and 3D CAD drawing.
 
 I have recently worked on several exciting projects that highlight my capabilities and innovative approach:
 
@@ -74,8 +74,8 @@ Chatham, Ontario
     -   Visual Basic .net
     -   HTML
     -   JavaScript
+    -   Nodejs
     -   ASP / ASP.net
-    -   Assembly language
 -   Object-oriented programming (OOP)
 -   Database design with SQL / Access / MySQL
 -   SQL server configuration
