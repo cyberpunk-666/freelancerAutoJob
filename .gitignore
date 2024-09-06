@@ -165,3 +165,4 @@ key.pem
 logs
 config_template.cfg
 key_unencrypted.pem
+profile.txt
