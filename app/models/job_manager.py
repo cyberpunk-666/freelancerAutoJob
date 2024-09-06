@@ -1,21 +1,23 @@
 import json
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from app.db.postgresdb import PostgresDB
 
 class JobManager:
-    def __init__(self, db: PostgresDB):
+    def __init__(self, db: PostgresDB, user_id: int):
         """
         Initialize the JobManager class with a PostgresDB instance.
         :param db: An instance of the PostgresDB class for database operations.
+        :param user_id: The ID of the authenticated user.
         """
         self.logger = logging.getLogger(__name__)
         self.db = db
+        self.user_id = user_id
 
     def generate_job_id(self, job_title: str) -> str:
-        """Generate a unique job ID using the MD5 hash of the job title."""
-        return hashlib.md5(job_title.encode('utf-8')).hexdigest()
+        """Generate a unique job ID using the SHA-256 hash of the job title."""
+        return hashlib.sha256(job_title.encode('utf-8')).hexdigest()
 
     def create_job(self, job_title: str, job_description: str, budget: str, status: str, 
                    email_date: datetime = None, gemini_results=None, performance_metrics=None) -> str:
@@ -37,7 +39,7 @@ class JobManager:
             'job_title': job_title,
             'job_description': job_description,
             'budget': budget,
-            'email_date': email_date or datetime.now(),
+            'email_date': email_date or datetime.now(tz=timezone.utc),
             'gemini_results': json.dumps(gemini_results or {}),
             'status': status,
             'performance_metrics': json.dumps(performance_metrics or {})
@@ -48,9 +50,9 @@ class JobManager:
 
     def read_job(self, job_id: str) -> dict:
         """Read a job entry from the job_details table."""
-        query = "SELECT * FROM job_details WHERE job_id = %s"
+        query = "SELECT * FROM job_details WHERE job_id = %s AND user_id = %s"
         self.logger.info(f"Fetching job with ID: {job_id}")
-        result = self.db.fetch_one(query, (job_id,))
+        result = self.db.fetch_one(query, (job_id, self.user_id))
         if result:
             job_details = {
                 'job_id': result[0],
@@ -62,7 +64,8 @@ class JobManager:
                 'status': result[6],
                 'performance_metrics': result[7],
                 'last_occurrence': result[8],
-                'occurrence_count': result[9]
+                'occurrence_count': result[9],
+                'user_id': result[10]
             }
             self.logger.info(f"Job found: {job_id}")
             return job_details
@@ -76,8 +79,12 @@ class JobManager:
         :param data: A dictionary containing the columns to update and their new values.
         """
         self.logger.info(f"Updating job: {job_id}")
-        self.db.update_object('job_details', data, {'job_id': job_id})
-        self.logger.info(f"Job updated successfully: {job_id}")
+        data['user_id'] = self.user_id
+        rows_affected = self.db.update_object('job_details', data, {'job_id': job_id, 'user_id': self.user_id})
+        if rows_affected > 0:
+            self.logger.info(f"Job updated successfully: {job_id}")
+        else:
+            self.logger.warning(f"Job update failed: {job_id}")
 
     def delete_job(self, job_id: str):
         """
@@ -85,8 +92,11 @@ class JobManager:
         :param job_id: The unique ID of the job.
         """
         self.logger.info(f"Deleting job: {job_id}")
-        self.db.delete_object('job_details', {'job_id': job_id})
-        self.logger.info(f"Job deleted successfully: {job_id}")
+        rows_affected = self.db.delete_object('job_details', {'job_id': job_id, 'user_id': self.user_id})
+        if rows_affected > 0:
+            self.logger.info(f"Job deleted successfully: {job_id}")
+        else:
+            self.logger.warning(f"Job deletion failed: {job_id}")
 
     def job_exists(self, job_title: str) -> bool:
         """
@@ -101,12 +111,12 @@ class JobManager:
     
     def fetch_all_jobs(self) -> list:
         """
-        Fetch all job entries from the job_details table.
+        Fetch all job entries from the job_details table for the authenticated user.
         :return: A list of dictionaries, each containing a job's details.
         """
-        query = "SELECT * FROM job_details"
+        query = "SELECT * FROM job_details WHERE user_id = %s"
         self.logger.info("Fetching all jobs")
-        results = self.db.fetch_all("SELECT * FROM job_details")
+        results = self.db.fetch_all(query, (self.user_id,))
         jobs = []
         for result in results:
             job = {
@@ -119,7 +129,8 @@ class JobManager:
                 'status': result[6],
                 'performance_metrics': result[7],
                 'last_occurrence': result[8],
-                'occurrence_count': result[9]
+                'occurrence_count': result[9],
+                'user_id': result[10]
             }
             jobs.append(job)
         return jobs

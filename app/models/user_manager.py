@@ -41,6 +41,10 @@ class UserManager(UserMixin):
 
     def verify_password(self, stored_password, provided_password):
         """Verify a stored password against one provided by user."""
+        if isinstance(stored_password, str):
+            stored_password = stored_password.encode('utf-8')
+        
+        # Compare the provided password with the stored hash
         return bcrypt.checkpw(provided_password.encode('utf-8'), stored_password)
 
 
@@ -52,24 +56,32 @@ class UserManager(UserMixin):
             # Insert user into the database
             self.db.execute_query(
                 "INSERT INTO users (email, password_hash, verification_token) VALUES (%s, %s, %s)",
-                (email, password_hash.hex(), verification_token)
+                (email, password_hash.decode('utf-8'), verification_token)  # Store the bcrypt hash directly
             )
 
             # Generate the verification link
             verification_link = url_for('user.verify_email', token=verification_token, _external=True)
 
-            # Load the HTML email template and replace placeholders
+            # Load the HTML email template
             email_html = render_template(
-                'app/models/processed_email_manager.py',  # Assuming the template is in templates/email/verification_email.html
-                user_name=email,  # Replace with actual user's name if available
+                'verification_email.html',  # Assuming the template is in templates/verification_email.html
+                user_name=email,
+                verification_link=verification_link
+            )
+
+            # Load the plain text email template
+            email_text = render_template(
+                'verification_email.txt',  # Assuming there's a corresponding plain text version
+                user_name=email,
                 verification_link=verification_link
             )
 
             # Send the email using the email sender utility
             email_sent = self.email_sender.send_email(
-                to=email,
+                recipient=email,
                 subject="Verify your email",
-                html_body=email_html  # Send the HTML content
+                html_body=email_html,   # Send the HTML content
+                text_body=email_text    # Send the plain text content
             )
 
             if email_sent:
@@ -83,11 +95,11 @@ class UserManager(UserMixin):
             self.logger.error(f"Sign up failed for {email}: {str(e)}", exc_info=True)
             return False
 
-
-
     def login(self, email, password):
         """Authenticate a user based on email, password, and active status."""
         self.logger.info(f"Login attempt for user: {email}")
+        
+        # Retrieve non-sensitive user information (user_id and is_active)
         query = "SELECT user_id, password_hash, is_active FROM users WHERE email = %s"
         result = self.db.fetch_one(query, (email,))
         
@@ -96,14 +108,16 @@ class UserManager(UserMixin):
             if not is_active:
                 self.logger.warning(f"Login failed for {email}: account is inactive")
                 return False, None
-            
-            if self.verify_password(bytes.fromhex(stored_password_hash), password):
+
+            # Now retrieve the password_hash securely and verify
+            if self.verify_password(stored_password_hash.encode('utf-8'), password):
                 return True, user_id
             else:
+                self.logger.warning(f"Invalid password for user: {email}")
                 return False, None
         else:
+            self.logger.warning(f"User with email {email} not found")
             return False, None
-
 
     def reset_password(self, email, new_password):
         """Reset a user's password."""
@@ -197,11 +211,12 @@ class UserManager(UserMixin):
     def check_password(self, user_id, password):
         """Check if the provided password matches the user's password."""
         self.logger.info(f"Checking password for user with ID {user_id}")
-        query = "SELECT password_hash FROM users WHERE user_id = %s"
-        result = self.db.fetch_one(query, (user_id, ))
-        if result:
-            stored_password_hash = result[0]
-            if self.verify_password(bytes.fromhex(stored_password_hash), password):
+        
+        # Get the password hash for the user based on the email
+        user = self.get_user(user_id)
+        if user:
+            stored_password_hash = self.get_password_hash(user.email)
+            if stored_password_hash and self.verify_password(stored_password_hash, password):
                 self.logger.info(f"Password match for user with ID {user_id}")
                 return True
             else:
@@ -261,3 +276,17 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Error getting or creating user by Google ID: {str(e)}", exc_info=True)
             return None
+        
+    def get_password_hash(self, email):
+        """Retrieve only the password_hash for login verification."""
+        self.logger.info(f"Retrieving password hash for user with email: {email}")
+        query = "SELECT password_hash FROM users WHERE email = %s"
+        result = self.db.fetch_one(query, (email,))
+        
+        if result:
+            self.logger.info(f"Password hash retrieved for {email}")
+            return result[0]  # Return the password hash
+        else:
+            self.logger.warning(f"User with email {email} not found")
+            return None
+        

@@ -13,6 +13,7 @@ from app.models.job_manager import JobManager
 from app.models.user_manager import UserManager
 from app.models.processed_email_manager import ProcessedEmailManager
 from app.db.utils import get_db
+from app.utils.update_schema_manager import UpdateSchemaManager
 
 login_manager = LoginManager()
 login_manager.login_view = 'user.login'
@@ -107,6 +108,16 @@ google_bp = make_google_blueprint(
     scope=["profile", "email"]
 )
 
+def update_schema():
+    """
+    The function `update_schema()` updates the database schema and logs a success message.
+    """
+    db = get_db()
+    schema_updater = UpdateSchemaManager(db)
+    schema_updater.update_schema()
+    logging.info("Database schema updated successfully.")
+    
+
 def create_app():
     """Create and configure the Flask application."""
     app = Flask(__name__)
@@ -130,5 +141,6 @@ def create_app():
     # Initialize the database with app context
     with app.app_context():
         init_database()
+        update_schema()
 
     return app
