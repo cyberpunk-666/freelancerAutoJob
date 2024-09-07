@@ -140,7 +140,7 @@ class JobManager:
         self.logger.info("Creating job_details table")
         create_table_query = """
         CREATE TABLE IF NOT EXISTS job_details (
-            job_id VARCHAR(32) PRIMARY KEY,
+            job_id VARCHAR(64) PRIMARY KEY,
             job_title TEXT NOT NULL,
             job_description TEXT,
             budget VARCHAR(50),

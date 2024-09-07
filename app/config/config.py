@@ -12,12 +12,22 @@ class MaxLengthFilter(logging.Filter):
         if len(record.msg) > self.max_length:
             record.msg = record.msg[: self.max_length] + "..."
         return True
-        
+import logging
+
+class CustomLogger(logging.Logger):
+    def error(self, msg, *args, exc_info=True, **kwargs):
+        super().error(msg, *args, exc_info=exc_info, **kwargs)
+
 def setup_logging(max_log_length=1000):
     """Setup logging with a single StreamHandler."""
-    # Configure the root logger
-    logger = logging.getLogger()
+    # Ensure custom logger class is used
+    logging.setLoggerClass(CustomLogger)
+    logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
+
+    # Also set the root logger level to DEBUG
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
 
     # Clear any existing handlers to prevent duplication
     if logger.hasHandlers():
@@ -32,7 +42,7 @@ def setup_logging(max_log_length=1000):
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
 
-    # Add the handler to the root logger
+    # Add the handler to the logger
     logger.addHandler(console_handler)
 
     # Add the max length filter to the logger
@@ -40,6 +50,7 @@ def setup_logging(max_log_length=1000):
     logger.addFilter(max_length_filter)
 
     return logger
+
     
 import os
 

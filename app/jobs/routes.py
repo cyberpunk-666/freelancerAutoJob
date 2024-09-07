@@ -6,9 +6,13 @@ from app.db.postgresdb import PostgresDB
 from app.db.utils import get_db
 import markdown 
 import logging
+from flask import jsonify, request
+from app.utils.job_application_processor import JobApplicationProcessor
+from app.utils.email_processor import EmailProcessor
+from app.utils.job_queue import JobQueue
+from app.utils.api_response import APIResponse
 
 job_bp = Blueprint('jobs', __name__)
-
 
 @job_bp.route('/jobs')
 @login_required
@@ -108,3 +112,46 @@ def job_detail(job_id):
             gemini_results['generate_application_letter']['fit'] = markdown.markdown(gemini_results['generate_application_letter']['fit'])
 
     return render_template('job_detail.html', job=job)
+            
+
+@job_bp.route('/fetch_jobs', methods=['POST'])
+def fetch_jobs():
+    db = get_db()
+    job_manager = JobManager(db, current_user.user_id)
+    email_processor = EmailProcessor(job_manager)
+    api_response = email_processor.fetch_jobs_from_email(current_user.user_id)
+
+    if api_response.status == "success":
+        response_data = api_response.data
+    else:
+        response_data = {
+            "error": api_response.message,
+            "job_list": []  # Returning an empty list in case of failure
+        }
+
+    return jsonify(response_data)
+
+
+@job_bp.route('/process_job/<int:job_id>', methods=['POST'])
+def process_job(job_id):
+    db = get_db()
+    job_manager = JobManager(db, current_user.user_id)
+    job = job_manager.read_job(job_id)
+    if job is None:
+        return jsonify({"error": "Job not found"}), 404
+    
+    job_processor = JobApplicationProcessor()
+    result = job_processor.process_job(job)
+    return jsonify({"success": True, "result": result})
+
+@job_bp.route('/queue_jobs', methods=['POST'])
+def queue_jobs():
+    job_ids = request.json.get('job_ids', [])
+    if not job_ids:
+        return jsonify({"error": "No job IDs provided"}), 400
+    
+    job_queue = JobQueue()
+    for job_id in job_ids:
+        job_queue.add_job(job_id, current_user.user_id)
+    
+    return jsonify({"success": True, "message": f"{len(job_ids)} jobs added to the queue"})

@@ -24,3 +24,6 @@ flask_talisman
 flask_limiter
 bcrypt
 flask_dance
+boto3
+pytest
+motos

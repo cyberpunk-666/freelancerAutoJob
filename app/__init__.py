@@ -32,60 +32,60 @@ def init_database():
     # Load environment variables from .env file
     logger = logging.getLogger(__name__)
     load_dotenv()
-    logging.info("Environment variables loaded from .env file.")
+    logger.info("Environment variables loaded from .env file.")
 
     # Initialize the PostgresDB instance
     try:
         db = get_db()
-        logging.info("Database connection established successfully.")
+        logger.info("Database connection established successfully.")
     except Exception as e:
-        logging.error(f"Failed to connect to the database: {e}")
+        logger.error(f"Failed to connect to the database: {e}")
         raise
 
     # Initialize the JobManager instance
     try:
-        job_manager = JobManager(db)
-        logging.info("JobManager instance created successfully.")
+        job_manager = JobManager(db, current_user.id)
+        logger.info("JobManager instance created successfully.")
     except Exception as e:
-        logging.error(f"Failed to create JobManager instance: {e}")
+        logger.error(f"Failed to create JobManager instance: {e}")
         raise
 
     # Create the job_manager table
     try:
         job_manager.create_table()
-        logging.info("job_manager table ensured to exist.")
+        logger.info("job_manager table ensured to exist.")
     except Exception as e:
-        logging.error(f"Failed to create job_manager table: {e}")
+        logger.error(f"Failed to create job_manager table: {e}")
         raise
     
     # initialize User instance
     try:
         user_manager = UserManager(db)
-        logging.info("User instance created successfully.")
+        logger.info("User instance created successfully.")
     except Exception as e:
-        logging.error(f"Failed to create User instance: {e}")
+        logger.error(f"Failed to create User instance: {e}")
         raise
     
     # create users table
     try:
         user_manager.create_table()
-        logging.info("users table ensured to exist.")
+        logger.info("users table ensured to exist.")
     except Exception as e:
-        logging.error(f"Failed to create users table: {e}")
+        logger.error(f"Failed to create users table: {e}")
         raise
 
     try:
-        processed_email_manager = ProcessedEmailManager(db)
-        logging.info("ProcessedEmailManager instance created successfully.")
+        processed_email_manager = ProcessedEmailManager(db, current_user.id)
+        logger.info("ProcessedEmailManager instance created successfully.")
     except Exception as e:
-        logging.error(f"Failed to create ProcessedEmailManager instance: {e}")
+        logger.error(f"Failed to create ProcessedEmailManager instance: {e}")
         raise
     
     try:
         processed_email_manager.create_table()
-        logging.info("processed_email_manager table ensured to exist.")
+        logger.info("processed_email_manager table ensured to exist.")
     except Exception as e:
-        logging.error(f"Failed to create processed_email_manager table: {e}")
+        logger.error(f"Failed to create processed_email_manager table: {e}")
         raise
     
 @login_manager.user_loader
@@ -94,13 +94,6 @@ def load_user(user_id):
     db = get_db()  # Use get_db to get the database connection
     user_manager = UserManager(db)
     return user_manager.get_user(user_id)
-
-def init_database():
-    """Initialize the database connection and create necessary tables."""
-    db = get_db()
-    user_manager = UserManager(db)
-    user_manager.create_table()
-    logging.info("Database initialized and tables created successfully.")
 
 google_bp = make_google_blueprint(
     client_id="my-key-here",
@@ -115,7 +108,8 @@ def update_schema():
     db = get_db()
     schema_updater = UpdateSchemaManager(db)
     schema_updater.update_schema()
-    logging.info("Database schema updated successfully.")
+    logger = logging.getLogger(__name__)
+    logger.info("Database schema updated successfully.")
     
 
 def create_app():
