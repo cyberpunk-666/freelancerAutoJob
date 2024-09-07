@@ -149,7 +149,8 @@ class JobManager:
             status VARCHAR(50),
             performance_metrics JSONB,
             last_occurrence TIMESTAMP,
-            occurrence_count INTEGER DEFAULT 1             
+            occurrence_count INTEGER DEFAULT 1,
+            user_id INTEGER NOT NULL             
         );
         """
         self.db.create_table(create_table_query)

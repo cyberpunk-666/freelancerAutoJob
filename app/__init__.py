@@ -12,9 +12,10 @@ import os
 from app.models.job_manager import JobManager
 from app.models.user_manager import UserManager
 from app.models.processed_email_manager import ProcessedEmailManager
+from app.models.role_manager import RoleManager
 from app.db.utils import get_db
 from app.utils.update_schema_manager import UpdateSchemaManager
-
+SYSTEM_USER_ID = 0
 login_manager = LoginManager()
 login_manager.login_view = 'user.login'
 login_manager.login_message_category = 'info'
@@ -28,66 +29,19 @@ def load_user(user_id):
     return user_manager.get_user(user_id)
 
 def init_database():
-    """Initialize the database connection and create necessary tables."""
-    # Load environment variables from .env file
-    logger = logging.getLogger(__name__)
-    load_dotenv()
-    logger.info("Environment variables loaded from .env file.")
+    # Create instances of the managers with the system user ID
+    db = get_db()
+    role_manager = RoleManager(db)
+    job_manager = JobManager(db, user_id=SYSTEM_USER_ID)
+    processed_email_manager = ProcessedEmailManager(db, user_id=SYSTEM_USER_ID)
+    user_manager = UserManager(db)
 
-    # Initialize the PostgresDB instance
-    try:
-        db = get_db()
-        logger.info("Database connection established successfully.")
-    except Exception as e:
-        logger.error(f"Failed to connect to the database: {e}")
-        raise
-
-    # Initialize the JobManager instance
-    try:
-        job_manager = JobManager(db, current_user.id)
-        logger.info("JobManager instance created successfully.")
-    except Exception as e:
-        logger.error(f"Failed to create JobManager instance: {e}")
-        raise
-
-    # Create the job_manager table
-    try:
-        job_manager.create_table()
-        logger.info("job_manager table ensured to exist.")
-    except Exception as e:
-        logger.error(f"Failed to create job_manager table: {e}")
-        raise
-    
-    # initialize User instance
-    try:
-        user_manager = UserManager(db)
-        logger.info("User instance created successfully.")
-    except Exception as e:
-        logger.error(f"Failed to create User instance: {e}")
-        raise
-    
-    # create users table
-    try:
-        user_manager.create_table()
-        logger.info("users table ensured to exist.")
-    except Exception as e:
-        logger.error(f"Failed to create users table: {e}")
-        raise
-
-    try:
-        processed_email_manager = ProcessedEmailManager(db, current_user.id)
-        logger.info("ProcessedEmailManager instance created successfully.")
-    except Exception as e:
-        logger.error(f"Failed to create ProcessedEmailManager instance: {e}")
-        raise
-    
-    try:
-        processed_email_manager.create_table()
-        logger.info("processed_email_manager table ensured to exist.")
-    except Exception as e:
-        logger.error(f"Failed to create processed_email_manager table: {e}")
-        raise
-    
+    # Call the create_tables method for each manager
+    user_manager.create_table()
+    job_manager.create_table()
+    processed_email_manager.create_table()
+    role_manager.create_tables()
+        
 @login_manager.user_loader
 def load_user(user_id):
     """Load user by ID."""

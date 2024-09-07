@@ -10,6 +10,7 @@ from flask import url_for, render_template
 from app.utils.email_sender import EmailSender
 import secrets
 import bcrypt
+from app.utils.crypto import Crypto
 class UserManager(UserMixin):
     def __init__(self, db):
         self.db = db
@@ -24,10 +25,12 @@ class UserManager(UserMixin):
             user_id SERIAL PRIMARY KEY,
             email VARCHAR(255) UNIQUE NOT NULL,
             password_hash VARCHAR(255) NOT NULL,
-            verification_token VARCHAR(64),  -- Add the verification_token column
-            email_verified BOOLEAN DEFAULT FALSE, -- Add email verification status
+            verification_token VARCHAR(64),
+            email_verified BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            is_active BOOLEAN DEFAULT TRUE
+            is_active BOOLEAN DEFAULT TRUE,
+            gemini_api_key VARCHAR(255),
+            crypto_salt VARCHAR(32),
         );
         """
         self.db.execute_query(create_table_query)
@@ -52,11 +55,12 @@ class UserManager(UserMixin):
         """Create a new user account with a hashed password."""
         password_hash = self.hash_password(password)
         verification_token = secrets.token_urlsafe(32)  # Generate a unique token for email verification
+        crypto_salt = bcrypt.gensalt()
         try:
             # Insert user into the database
             self.db.execute_query(
-                "INSERT INTO users (email, password_hash, verification_token) VALUES (%s, %s, %s)",
-                (email, password_hash.decode('utf-8'), verification_token)  # Store the bcrypt hash directly
+                "INSERT INTO users (email, password_hash, verification_token, crypto_salt) VALUES (%s, %s, %s, %s)",
+                (email, password_hash.decode('utf-8'), verification_token, crypto_salt)  # Store the bcrypt hash directly
             )
 
             # Generate the verification link
@@ -96,17 +100,21 @@ class UserManager(UserMixin):
             return False
 
     def login(self, email, password):
-        """Authenticate a user based on email, password, and active status."""
+        """Authenticate a user based on email, password, active status, and email verification."""
         self.logger.info(f"Login attempt for user: {email}")
         
-        # Retrieve non-sensitive user information (user_id and is_active)
-        query = "SELECT user_id, password_hash, is_active FROM users WHERE email = %s"
+        # Retrieve non-sensitive user information (user_id, is_active, and email_verified)
+        query = "SELECT user_id, password_hash, is_active, email_verified FROM users WHERE email = %s"
         result = self.db.fetch_one(query, (email,))
         
         if result:
-            user_id, stored_password_hash, is_active = result
+            user_id, stored_password_hash, is_active, email_verified = result
             if not is_active:
                 self.logger.warning(f"Login failed for {email}: account is inactive")
+                return False, None
+            
+            if not email_verified:
+                self.logger.warning(f"Login failed for {email}: email not verified")
                 return False, None
 
             # Now retrieve the password_hash securely and verify
@@ -118,6 +126,7 @@ class UserManager(UserMixin):
         else:
             self.logger.warning(f"User with email {email} not found")
             return False, None
+
 
     def reset_password(self, email, new_password):
         """Reset a user's password."""
@@ -226,6 +235,7 @@ class UserManager(UserMixin):
             self.logger.warning(f"User with ID {user_id} not found")
             return False
 
+
     def update_password(self, user_id, new_password):
         """Update a user's password."""
         self.logger.info(f"Updating password for user with ID {user_id}")
@@ -290,3 +300,37 @@ class UserManager(UserMixin):
             self.logger.warning(f"User with email {email} not found")
             return None
         
+    def encrypt_sensible_data(self):
+        crypto = Crypto()
+        
+    def update_last_login(self, user_id):
+        """Update the last_login timestamp for a user."""
+        self.logger.info(f"Updating last login for user with ID {user_id}")
+        try:
+            self.db.execute_query(
+                "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = %s",
+                (user_id,)
+            )
+            self.logger.info(f"Last login updated successfully for user with ID {user_id}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to update last login for user {user_id}: {str(e)}", exc_info=True)
+            return False
+
+    def update(self, user_id, **kwargs):
+        """"""
+        self.logger.info(f"Updating user with ID {user_id}")
+        try:
+            set_clause = ", ".join([f"{key} = %s" for key in kwargs.keys()])
+            values = list(kwargs.values())
+            values.append(user_id)
+            self.db.execute_query(
+                f"UPDATE users SET {set_clause} WHERE user_id = %s",
+                tuple(values)
+            )
+            self.logger.info(f"User with ID {user_id} updated successfully")
+            return True
+        
+        except Exception as e:
+            self.logger.error(f"Failed to update user {user_id}: {str(e)}", exc_info=True)
+            return False
