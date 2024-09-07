@@ -1,11 +1,11 @@
 import logging
-
+from app.utils.api_response import APIResponse
 class RoleManager:
     def __init__(self, db):
         self.db = db
         self.logger = logging.getLogger(__name__)
 
-    def create_tables(self):
+    def create_tables(self) -> APIResponse:
         """Create the roles and user_roles tables if they don't exist."""
         self.logger.info("Creating roles and user_roles tables")
 
@@ -27,8 +27,9 @@ class RoleManager:
         self.db.execute_query(create_user_roles_table_query)
 
         self.logger.info("Roles and user_roles tables created successfully")
+        return APIResponse(status="success", message="Tables created successfully")
 
-    def create_role(self, role_name):
+    def create_role(self, role_name) -> APIResponse:
         """Create a new role."""
         self.logger.info(f"Creating role: {role_name}")
         try:
@@ -37,12 +38,12 @@ class RoleManager:
                 (role_name,)
             )
             self.logger.info(f"Role '{role_name}' created successfully")
-            return True
+            return APIResponse(status="success", message=f"Role '{role_name}' created successfully")
         except Exception as e:
             self.logger.error(f"Failed to create role '{role_name}': {str(e)}", exc_info=True)
-            return False
+            return APIResponse(status="failure", message=f"Failed to create role '{role_name}'")
 
-    def assign_role_to_user(self, user_id, role_name):
+    def assign_role_to_user(self, user_id, role_name) -> APIResponse:
         """Assign a role to a user."""
         self.logger.info(f"Assigning role '{role_name}' to user with ID {user_id}")
         try:
@@ -55,15 +56,15 @@ class RoleManager:
                     (user_id, role_id)
                 )
                 self.logger.info(f"Role '{role_name}' assigned to user with ID {user_id} successfully")
-                return True
+                return APIResponse(status="success", message=f"Role '{role_name}' assigned successfully")
             else:
                 self.logger.error(f"Role '{role_name}' does not exist")
-                return False
+                return APIResponse(status="failure", message=f"Role '{role_name}' does not exist")
         except Exception as e:
             self.logger.error(f"Failed to assign role '{role_name}' to user with ID {user_id}: {str(e)}", exc_info=True)
-            return False
+            return APIResponse(status="failure", message=f"Failed to assign role '{role_name}'")
 
-    def remove_role_from_user(self, user_id, role_name):
+    def remove_role_from_user(self, user_id, role_name) -> APIResponse:
         """Remove a role from a user."""
         self.logger.info(f"Removing role '{role_name}' from user with ID {user_id}")
         try:
@@ -76,15 +77,15 @@ class RoleManager:
                     (user_id, role_id)
                 )
                 self.logger.info(f"Role '{role_name}' removed from user with ID {user_id} successfully")
-                return True
+                return APIResponse(status="success", message=f"Role '{role_name}' removed successfully")
             else:
                 self.logger.error(f"Role '{role_name}' does not exist")
-                return False
+                return APIResponse(status="failure", message=f"Role '{role_name}' does not exist")
         except Exception as e:
             self.logger.error(f"Failed to remove role '{role_name}' from user with ID {user_id}: {str(e)}", exc_info=True)
-            return False
+            return APIResponse(status="failure", message=f"Failed to remove role '{role_name}'")
 
-    def get_user_roles(self, user_id):
+    def get_user_roles(self, user_id) -> APIResponse:
         """Get all roles assigned to a user."""
         self.logger.info(f"Getting roles for user with ID {user_id}")
         try:
@@ -96,12 +97,12 @@ class RoleManager:
             """
             roles = [row[0] for row in self.db.fetch_all(query, (user_id,))]
             self.logger.info(f"Roles retrieved for user with ID {user_id}: {', '.join(roles)}")
-            return roles
+            return APIResponse(status="success", message="Roles retrieved successfully", data=roles)
         except Exception as e:
             self.logger.error(f"Failed to get roles for user with ID {user_id}: {str(e)}", exc_info=True)
-            return []
+            return APIResponse(status="failure", message="Failed to retrieve roles")
 
-    def has_role(self, user_id, role_name):
+    def has_role(self, user_id, role_name) -> APIResponse:
         """Check if a user has a specific role."""
         self.logger.info(f"Checking if user with ID {user_id} has role '{role_name}'")
         try:
@@ -114,10 +115,10 @@ class RoleManager:
                 )
                 has_role = result[0] > 0
                 self.logger.info(f"User with ID {user_id} {'has' if has_role else 'does not have'} role '{role_name}'")
-                return has_role
+                return APIResponse(status="success", message="Role check successful", data={"has_role": has_role})
             else:
                 self.logger.error(f"Role '{role_name}' does not exist")
-                return False
+                return APIResponse(status="failure", message=f"Role '{role_name}' does not exist")
         except Exception as e:
             self.logger.error(f"Failed to check role '{role_name}' for user with ID {user_id}: {str(e)}", exc_info=True)
-            return False
+            return APIResponse(status="failure", message="Failed to check role")
