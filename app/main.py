@@ -9,6 +9,8 @@ import os
 from app.models.job_manager import JobManager
 from app.utils.job_queue import JobQueue
 from app.utils.job_application_processor import JobApplicationProcessor
+from app.models.user_manager import UserManager
+from app.db.utils import get_db
 
 setup_logging()
 app = create_app()
@@ -16,9 +18,26 @@ app = create_app()
 Talisman(app, content_security_policy=None)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
+
 @app.route('/')
 def root():
-    return redirect(url_for('jobs.index'))
+    db = get_db()
+    user_manager = UserManager(db)
+    
+    # Check if the system is initialized
+    init_response = user_manager.system_initialized()
+    
+    if init_response.status != "success":
+        # If there was an error checking initialization status, render an error page
+        return render_template('error.html', message="Failed to check system initialization status. Please try again later.")
+    
+    if not init_response.data["initialized"]:
+        # If the system is not initialized, redirect to the initial setup
+        return redirect(url_for('setup.initial_setup_get'))
+    else:
+        # If the system is initialized, redirect to the jobs index as before
+        return redirect(url_for('jobs.index'))
+
 
 if __name__ == '__main__':
     app.logger.info("Starting app...")

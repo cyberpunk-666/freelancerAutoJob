@@ -1,0 +1,26 @@
+{% extends "small_layout.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<h2>Initial System Setup</h2>
+
+<form method="POST">
+    <div class="form-group">
+        <label for="email">Admin Email:</label>
+        <input class="form-control" type="email" id="email" name="email" required>
+    </div>
+    <div class="form-group">
+        <label for="password">Admin Password:</label>
+        <input class="form-control" type="password" id="password" name="password" required>
+    </div>
+    <div class="form-group">
+        <label for="confirm_password">Confirm Password:</label>
+        <input class="form-control" type="password" id="confirm_password" name="confirm_password" required>
+    </div>    
+    <div class="form-group text-center">
+        <input class="btn btn-primary btn-block" type="submit" value="Create Admin Account">
+    </div>
+</form>
+{% endblock %}
+

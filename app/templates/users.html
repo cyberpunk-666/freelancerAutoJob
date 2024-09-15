@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Administration</title>
+    <script src="{{ url_for('static', filename='js/users.js') }}" defer></script>
+</head>
+<body>
+    <h1>User Administration</h1>
+    
+    <div id="userList">
+        <h2>Users</h2>
+        <ul id="userListItems"></ul>
+        <input type="text" id="searchInput" placeholder="Search users">
+        <button onclick="searchUsers()">Search</button>
+    </div>
+
+    <div id="userForm">
+        <h2>Create/Edit User</h2>
+        <input type="hidden" id="userId">
+        <input type="text" id="userName" placeholder="User name">
+        <input type="email" id="userEmail" placeholder="User email">
+        <input type="password" id="userPassword" placeholder="User password">
+        <button onclick="saveUser()">Save User</button>
+    </div>
+
+    <div id="userDetails" style="display: none;">
+        <h2>User Details</h2>
+        <h3 id="currentUserName"></h3>
+        <p id="currentUserEmail"></p>
+        <button onclick="editUser()">Edit User</button>
+        <button onclick="deleteUser()">Delete User</button>
+
+        <h3>User Roles</h3>
+        <ul id="userRoles"></ul>
+    </div>
+</body>
+</html>

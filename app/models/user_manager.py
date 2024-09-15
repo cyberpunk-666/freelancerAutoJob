@@ -30,7 +30,9 @@ class UserManager(UserMixin):
                     email_verified BOOLEAN DEFAULT FALSE,
                     verification_token VARCHAR(255),
                     google_id VARCHAR(255),
-                    last_login TIMESTAMP
+                    last_login TIMESTAMP,
+                    crypto_salt VARCHAR(255),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             self.logger.info("Users table created successfully")
@@ -53,7 +55,7 @@ class UserManager(UserMixin):
     def verify_password(self, hashed_password, password) -> APIResponse:
         """Verify the provided password against the hashed password."""
         try:
-            if bcrypt.checkpw(password.encode("utf-8"), hashed_password.encode("utf-8")):
+            if bcrypt.checkpw(password.encode("utf-8"), hashed_password):
                 self.logger.info("Password verified successfully")
                 return APIResponse(status="success", message="Password verified successfully")
             else:
@@ -124,7 +126,13 @@ class UserManager(UserMixin):
                 user = User(user_id=result[0], email=result[1], is_active=result[2])
                 self.logger.info(f"User retrieved successfully: {user.email}")
                 return APIResponse(status="success", message="User retrieved successfully", data={"user": user})
-            
+            else:
+                self.logger.warning(f"User with ID {user_id} not found")
+                return APIResponse(status="failure", message="User not found")
+        except Exception as e:
+            self.logger.error(f"Failed to retrieve user with ID {user_id}: {str(e)}", exc_info=True)
+            return APIResponse(status="failure", message=f"Failed to retrieve user with ID {user_id}: {str(e)}")
+        
     def login(self, email, password) -> APIResponse:
         """Authenticate a user based on email, password, active status, and email verification."""
         self.logger.info(f"Login attempt for user: {email}")
@@ -199,13 +207,6 @@ class UserManager(UserMixin):
             self.logger.error(f"Failed to retrieve users: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to retrieve users: {str(e)}")
                 
-                else:
-                    self.logger.warning(f"User with ID {user_id} not found")
-                    return APIResponse(status="failure", message="User not found")
-            except Exception as e:
-                self.logger.error(f"Failed to retrieve user with ID {user_id}: {str(e)}", exc_info=True)
-                return APIResponse(status="failure", message=f"Failed to retrieve user with ID {user_id}: {str(e)}")
-
 
     def activate_user(self, user_id) -> APIResponse:
         """Activate a user account."""
@@ -244,6 +245,19 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Failed to delete user {user_id}: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to delete user {user_id}: {str(e)}")
+
+    def verify_password_hash(self, hashed_password, password) -> APIResponse:
+        """Verify the provided password against the hashed password."""
+        try:
+            if bcrypt.checkpw(password.encode("utf-8"), hashed_password):
+                self.logger.info("Password verified successfully")
+                return APIResponse(status="success", message="Password verified successfully")
+            else:
+                self.logger.warning("Password verification failed")
+                return APIResponse(status="failure", message="Password verification failed")
+        except Exception as e:
+            self.logger.error(f"Failed to verify password: {str(e)}", exc_info=True)
+            return APIResponse(status="failure", message=f"Failed to verify password: {str(e)}")
 
     def check_password(self, user_id, password) -> APIResponse:
         """Check if the provided password matches the user's password."""
@@ -289,6 +303,7 @@ class UserManager(UserMixin):
     def verify_email(self, email, token) -> APIResponse:
         """Verify user's email using the provided token."""
         try:
+            result = self.db.fetch_one("SELECT user_id FROM users WHERE email = %s AND verification_token = %s", (email, token))
             if result:
                 user_id = result[0]
                 data = {"email_verified": True, "verification_token": None}
@@ -322,19 +337,26 @@ class UserManager(UserMixin):
             return APIResponse(status="failure", message=f"Error getting or creating user by Google ID: {str(e)}")
 
     def get_password_hash(self, email) -> APIResponse:
-        """Retrieve only the password_hash for login verification."""
-        self.logger.info(f"Retrieving password hash for user with email: {email}")
-        query = "SELECT password_hash FROM users WHERE email = %s"
-        result = self.db.fetch_one(query, (email,))
-        if result:
-            self.logger.info(f"Password hash retrieved for {email}")
-            return APIResponse(status="success", message="Password hash retrieved", data={"password_hash": result[0]})
-        else:
-            self.logger.warning(f"User with email {email} not found")
-            return APIResponse(status="failure", message="User not found")
-
+        """Retrieve the password hash for a given email."""
+        self.logger.info(f"Retrieving password hash for email {email}")
+        try:
+            cursor = self.db.cursor()
+            cursor.execute("SELECT password_hash FROM users WHERE email = %s", (email,))
+            result = cursor.fetchone()
+            if result:
+                password_hash = result[0]
+                self.logger.info(f"Password hash retrieved for email {email}")
+                return APIResponse(status="success", message="Password hash retrieved", data={"password_hash": password_hash})
+            else:
+                self.logger.warning(f"No user found with email {email}")
+                return APIResponse(status="failure", message="User not found")
+        except Exception as e:
+            self.logger.error(f"Failed to retrieve password hash: {str(e)}", exc_info=True)
+            return APIResponse(status="failure", message=f"Failed to retrieve password hash: {str(e)}")
+        
     def encrypt_sensible_data(self):
         crypto = Crypto()
+        
         # Implement encryption logic here
 
     def update_last_login(self, user_id) -> APIResponse:
@@ -380,3 +402,70 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Failed to retrieve user with email {email}: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to retrieve user with email {email}: {str(e)}")
+
+    def user_has_role(self, user_id, role_name) -> APIResponse:
+        """Check if a user has a specific role."""
+        self.logger.info(f"Checking if user {user_id} has role {role_name}")
+        try:
+            query = """
+                SELECT 1 FROM user_roles ur
+                JOIN roles r ON ur.role_id = r.id
+                WHERE ur.user_id = %s AND r.name = %s
+            """
+            result = self.db.fetch_one(query, (user_id, role_name))
+            if result:
+                self.logger.info(f"User {user_id} has role {role_name}")
+                return APIResponse(status="success", message="User has the specified role", data={"has_role": True})
+            else:
+                self.logger.info(f"User {user_id} does not have role {role_name}")
+                return APIResponse(status="success", message="User does not have the specified role", data={"has_role": False})
+        except Exception as e:
+            self.logger.error(f"Failed to check role for user {user_id}: {str(e)}", exc_info=True)
+            return
+
+    def system_initialized(self) -> APIResponse:
+        """Check if the system has been initialized with any users or roles."""
+        self.logger.info("Checking if the system has been initialized")
+        try:
+            user_count = self.db.fetch_one("SELECT COUNT(*) FROM users")[0]
+            role_count = self.db.fetch_one("SELECT COUNT(*) FROM roles")[0]
+            
+            is_initialized = user_count > 0 and role_count > 0
+            
+            if is_initialized:
+                self.logger.info("System has been initialized")
+            else:
+                self.logger.info("System has not been initialized")
+            
+            return APIResponse(
+                status="success",
+                message="System initialization check completed",
+                data={"initialized": is_initialized}
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to check system initialization: {str(e)}", exc_info=True)
+            return APIResponse(status="failure", message=f"Failed to check system initialization: {str(e)}")
+
+    def create_user(self, email, password, is_active=True):
+        self.logger.info(f"Creating new user with email {email}")
+        try:
+            hash_password_response = self.hash_password(password)
+            if hash_password_response.status == "success":
+                
+                password_hash = hash_password_response.data["hashed_password"]
+                verification_token = secrets.token_urlsafe(32)
+                crypto_salt = bcrypt.gensalt()
+
+                self.db.execute_query(
+                    "INSERT INTO users (email, password_hash, crypto_salt, email_verified) VALUES (%s, %s, %s, %s, %s)",
+                    (email, password_hash, verification_token, crypto_salt, True)
+                )
+
+                self.logger.info(f"User created successfully")
+                return APIResponse(status="success", message="User created successfully")
+            else:
+                return hash_password_response
+        except Exception as e:
+            self.db.rollback()
+            self.logger.error(f"Failed to create user: {str(e)}", exc_info=True)
+            return APIResponse(status="failure", message=f"Failed to create user: {str(e)}")

@@ -1,13 +1,13 @@
 import logging
 from datetime import datetime
-from app.utils import APIResponse
+from app.utils.api_response import APIResponse
 
 class JobManager:
     def __init__(self, db):
         self.db = db
         self.logger = logging.getLogger(__name__)
 
-    def create_tables(self) -> APIResponse:
+    def create_table(self) -> APIResponse:
         """Create the jobs and job_applications tables if they don't exist."""
         try:
             create_jobs_table_query = """

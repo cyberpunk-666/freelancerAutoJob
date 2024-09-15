@@ -19,6 +19,7 @@ csrf = CSRFProtect()
 limiter = Limiter(key_func=get_remote_address)
 
 user_bp = Blueprint('user', __name__)
+user_api_bp = Blueprint('user_api', __name__)
 
 @user_bp.route('/signup', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
@@ -34,21 +35,34 @@ def signup():
             flash('Sign-up failed. Email might already be registered.', 'danger')
     return render_template('signup.html', form=form)
 
+
 @user_bp.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
     if form.validate_on_submit():
         db = get_db()  # Get the database instance
         user_manager = UserManager(db)  # Initialize UserManager with the db instance
-        success, user_id = user_manager.login(form.email.data, form.password.data)
-        if success:
-            user = user_manager.get_user(user_id)  # Retrieve the User instance
-            if user:
+        
+        # Login attempt
+        login_response = user_manager.login(form.email.data, form.password.data)
+        
+        if login_response.status == "success":
+            # Retrieve usern
+            user_response = user_manager.get_user(login_response.data["user_id"])
+            
+            if user_response.status == "success":
+                user = user_response.data["user"]
                 login_user(user)
-                flash('Login successful!', 'success')
+                flash(login_response.message, 'success')
                 return redirect(url_for('jobs.index'))
-        flash('Login failed. Check your credentials.', 'danger')
+            else:
+                flash(user_response.message, 'danger')
+        else:
+            flash(login_response.message, 'danger')
+    
     return render_template('login.html', form=form)
+
+
 
 
 @user_bp.route('/logout')
@@ -135,3 +149,4 @@ def google_login():
     else:
         flash('Failed to get user info from Google.', 'danger')
         return redirect(url_for('user.login'))
+

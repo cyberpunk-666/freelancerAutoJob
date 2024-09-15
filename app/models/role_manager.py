@@ -122,3 +122,14 @@ class RoleManager:
         except Exception as e:
             self.logger.error(f"Failed to check role '{role_name}' for user with ID {user_id}: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message="Failed to check role")
+
+    def get_all_roles(self) -> APIResponse:
+        """Get all available roles."""
+        self.logger.info("Getting all roles")
+        try:
+            roles = [row[0] for row in self.db.fetch_all("SELECT role_name FROM roles")]
+            self.logger.info(f"Roles retrieved: {', '.join(roles)}")
+            return APIResponse(status="success", message="Roles retrieved successfully", data=roles)
+        except Exception as e:
+            self.logger.error(f"Failed to get roles: {str(e)}", exc_info=True)
+            return APIResponse(status="failure", message="Failed to retrieve roles")

@@ -20,7 +20,7 @@ def jobs():
     if current_user.is_authenticated:
         db = get_db()
         logging.info("Fetching all jobs")
-        job_manager = JobManager(db, current_user.user_id)
+        job_manager = JobManager(db)
         jobs = job_manager.fetch_all_jobs()
     else:
         return redirect(url_for('user.login', next=request.url))
@@ -33,7 +33,7 @@ def create_job():
     logging.info("Create job form submitted")
     if form.validate_on_submit():
         db = get_db()
-        job_manager = JobManager(db, current_user.user_id)
+        job_manager = JobManager(db)
         job_manager.create_job(form.title.data, form.description.data, form.budget.data, form.status.data)
         flash('Job created successfully!', 'success')
         logging.info(f"Job created: {form.title.data}")
@@ -44,7 +44,7 @@ def create_job():
 @login_required
 def update_job(job_id):
     db = get_db()
-    job_manager = JobManager(db, current_user.user_id)
+    job_manager = JobManager(db)
     logging.info(f"Updating job: {job_id}")
     job = job_manager.read_job(job_id)
     if job is None:
@@ -62,7 +62,7 @@ def update_job(job_id):
 @login_required
 def delete_job(job_id):
     db = get_db()
-    job_manager = JobManager(db, current_user.user_id)
+    job_manager = JobManager(db)
     logging.info(f"Deleting job: {job_id}")
     job = job_manager.read_job(job_id)
     if job is None:
@@ -78,7 +78,7 @@ def delete_job(job_id):
 def index():
     if current_user.is_authenticated:
         db = get_db()
-        job_manager = JobManager(db, current_user.user_id)
+        job_manager = JobManager(db)
         logging.info("Fetching all jobs for index page")
         jobs = job_manager.db.fetch_all('SELECT * FROM job_details WHERE user_id = %s ORDER BY email_date DESC', (current_user.user_id,))
         return render_template('jobs.html', jobs=jobs)
@@ -89,7 +89,7 @@ def index():
 @login_required
 def job_detail(job_id):
     db = get_db()
-    job_manager = JobManager(db, current_user.user_id)
+    job_manager = JobManager(db)
     logging.info(f"Fetching job details for job: {job_id}")
     job = job_manager.read_job(job_id)
     if job is None:
@@ -117,7 +117,7 @@ def job_detail(job_id):
 @job_bp.route('/fetch_jobs', methods=['POST'])
 def fetch_jobs():
     db = get_db()
-    job_manager = JobManager(db, current_user.user_id)
+    job_manager = JobManager(db)
     email_processor = EmailProcessor(job_manager)
     api_response = email_processor.fetch_jobs_from_email(current_user.user_id)
 
@@ -135,7 +135,7 @@ def fetch_jobs():
 @job_bp.route('/process_job/<int:job_id>', methods=['POST'])
 def process_job(job_id):
     db = get_db()
-    job_manager = JobManager(db, current_user.user_id)
+    job_manager = JobManager(db)
     job = job_manager.read_job(job_id)
     if job is None:
         return jsonify({"error": "Job not found"}), 404
