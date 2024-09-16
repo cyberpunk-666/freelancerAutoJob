@@ -10,6 +10,7 @@ from app.models.job_manager import JobManager
 from app.utils.job_queue import JobQueue
 from app.utils.job_application_processor import JobApplicationProcessor
 from app.models.user_manager import UserManager
+from app.models.role_manager import RoleManager
 from app.db.utils import get_db
 
 setup_logging()
@@ -18,6 +19,10 @@ app = create_app()
 Talisman(app, content_security_policy=None)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
+@app.context_processor
+def inject_role_manager():
+    role_manager = RoleManager(get_db())
+    return dict(role_manager=role_manager)
 
 @app.route('/')
 def root():

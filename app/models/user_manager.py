@@ -31,7 +31,6 @@ class UserManager(UserMixin):
                     verification_token VARCHAR(255),
                     google_id VARCHAR(255),
                     last_login TIMESTAMP,
-                    crypto_salt VARCHAR(255),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -45,6 +44,7 @@ class UserManager(UserMixin):
         """Hash the provided password."""
         try:
             hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+            verify_password_response = self.verify_password(hashed_password, password)
             self.logger.info("Password hashed successfully")
             return APIResponse(status="success", message="Password hashed successfully", data={"hashed_password": hashed_password})
         except Exception as e:
@@ -55,7 +55,7 @@ class UserManager(UserMixin):
     def verify_password(self, hashed_password, password) -> APIResponse:
         """Verify the provided password against the hashed password."""
         try:
-            if bcrypt.checkpw(password.encode("utf-8"), hashed_password):
+            if bcrypt.checkpw(password.encode("utf-8"), hashed_password.encode("utf-8")):
                 self.logger.info("Password verified successfully")
                 return APIResponse(status="success", message="Password verified successfully")
             else:
@@ -72,11 +72,10 @@ class UserManager(UserMixin):
             if hash_password_response.status == "success":
                 password_hash = hash_password_response.data["hashed_password"]
                 verification_token = secrets.token_urlsafe(32)
-                crypto_salt = bcrypt.gensalt()
 
                 self.db.execute_query(
-                    "INSERT INTO users (email, password_hash, verification_token, crypto_salt) VALUES (%s, %s, %s, %s)",
-                    (email, password_hash, verification_token, crypto_salt)
+                    "INSERT INTO users (email, password_hash, verification_token) VALUES (%s, %s, %s)",
+                    (email, password_hash, verification_token)
                 )
 
                 verification_link = url_for('user.verify_email', token=verification_token, _external=True)
@@ -151,7 +150,7 @@ class UserManager(UserMixin):
                     self.logger.warning(f"Login failed for {email}: email not verified")
                     return APIResponse(status="failure", message="Email not verified")
 
-                verify_password_response = self.verify_password(stored_password_hash.encode('utf-8'), password)
+                verify_password_response = self.verify_password(stored_password_hash, password)
                 if verify_password_response.status == "success":
                     self.logger.info(f"Login successful for user: {email}")
                     return APIResponse(status="success", message="Login successful", data={"user_id": user_id})
@@ -245,19 +244,6 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Failed to delete user {user_id}: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to delete user {user_id}: {str(e)}")
-
-    def verify_password_hash(self, hashed_password, password) -> APIResponse:
-        """Verify the provided password against the hashed password."""
-        try:
-            if bcrypt.checkpw(password.encode("utf-8"), hashed_password):
-                self.logger.info("Password verified successfully")
-                return APIResponse(status="success", message="Password verified successfully")
-            else:
-                self.logger.warning("Password verification failed")
-                return APIResponse(status="failure", message="Password verification failed")
-        except Exception as e:
-            self.logger.error(f"Failed to verify password: {str(e)}", exc_info=True)
-            return APIResponse(status="failure", message=f"Failed to verify password: {str(e)}")
 
     def check_password(self, user_id, password) -> APIResponse:
         """Check if the provided password matches the user's password."""
@@ -409,8 +395,8 @@ class UserManager(UserMixin):
         try:
             query = """
                 SELECT 1 FROM user_roles ur
-                JOIN roles r ON ur.role_id = r.id
-                WHERE ur.user_id = %s AND r.name = %s
+                JOIN roles r ON ur.role_id = r.role_id
+                WHERE ur.user_id = %s AND r.role_name = %s
             """
             result = self.db.fetch_one(query, (user_id, role_name))
             if result:
@@ -453,19 +439,90 @@ class UserManager(UserMixin):
             if hash_password_response.status == "success":
                 
                 password_hash = hash_password_response.data["hashed_password"]
-                verification_token = secrets.token_urlsafe(32)
-                crypto_salt = bcrypt.gensalt()
-
-                self.db.execute_query(
-                    "INSERT INTO users (email, password_hash, crypto_salt, email_verified) VALUES (%s, %s, %s, %s, %s)",
-                    (email, password_hash, verification_token, crypto_salt, True)
+                user_id = self.db.execute_query(
+                    "INSERT INTO users (email, password_hash, email_verified) VALUES (%s, %s, %s) RETURNING user_id",
+                    (email, password_hash, True)
                 )
 
                 self.logger.info(f"User created successfully")
-                return APIResponse(status="success", message="User created successfully")
+                return APIResponse(status="success", message="User created successfully", data={"user_id": user_id})
             else:
                 return hash_password_response
         except Exception as e:
             self.db.rollback()
             self.logger.error(f"Failed to create user: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to create user: {str(e)}")
+
+    def search_users(self, query, page=1, page_size=10):
+        self.logger.info(f"Searching for users with query: {query}")
+        try:
+            offset = (page - 1) * page_size
+            users = []
+            results = self.db.fetch_all(
+                "SELECT * FROM users WHERE email LIKE %s OR username LIKE %s LIMIT %s OFFSET %s",
+                (f"%{query}%", f"%{query}%", page_size, offset)
+            )
+            for result in results:
+                user = UserManager(*result)
+                users.append(user)
+            self.logger.info(f"Found {len(users)} users matching the search query")
+            return APIResponse(status="success", message="Users retrieved successfully", data={"users": users})
+        except Exception as e:
+            self.logger.error(f"Failed to search users: {str(e)}", exc_info=True)
+            return APIResponse(status="failure", message=f"Failed to search users: {str(e)}")
+        
+    def update_user(self, user_id, data):
+        self.logger.info(f"Updating user with ID {user_id}")
+        try:
+            condition = {"user_id": user_id}
+            self.db.update_object("users", data, condition)
+            self.logger.info(f"User with ID {user_id} updated successfully")
+            return APIResponse(status="success", message="User updated successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to update user {user_id}: {str(e)}", exc_info=True)
+            return APIResponse(status="failure", message=f"Failed to update user {user_id}: {str(e)}")
+        
+    def delete_user(self, user_id):
+        self.logger.info(f"Deleting user with ID {user_id}")
+        try:
+            condition = {"user_id": user_id}
+            self.db.delete_object("users", condition)
+            self.logger.info(f"User with ID {user_id} deleted successfully")
+            return APIResponse(status="success", message="User deleted successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to delete user {user_id}: {str(e)}", exc_info=True)
+            return APIResponse(status="failure", message=f"Failed to delete user {user_id}: {str(e)}")
+        
+    def get_user_roles(self, user_id):
+        self.logger.info(f"Retrieving roles for user with ID {user_id}")
+        try:
+            query = """
+                SELECT r.role_name
+                FROM user_roles ur
+                JOIN roles r ON ur.role_id = r.role_id
+                WHERE ur.user_id = %s
+            """
+            roles = [row[0] for row in self.db.fetch_all(query, (user_id,))]
+            self.logger.info(f"Roles retrieved for user with ID {user_id}: {', '.join(roles)}")
+            return APIResponse(status="success", message="Roles retrieved successfully", data=roles)
+        except Exception as e:
+            self.logger.error(f"Failed to retrieve roles for user {user_id}: {str(e)}", exc_info=True)
+            return APIResponse(status="failure", message=f"Failed to retrieve roles for user {user_id}: {str(e)}")
+        
+    def get_free_users(self, page=1, page_size=10):
+        self.logger.info("Retrieving free users")
+        try:
+            offset = (page - 1) * page_size
+            users = []
+            results = self.db.fetch_all(
+                "SELECT * FROM users WHERE user_id NOT IN (SELECT user_id FROM user_roles) LIMIT %s OFFSET %s",
+                (page_size, offset)
+            )
+            for result in results:
+                user = UserManager(*result)
+                users.append(user)
+            self.logger.info(f"Retrieved {len(users)} free users successfully")
+            return APIResponse(status="success", message="Free users retrieved successfully", data={"users": users})
+        except Exception as e:
+            self.logger.error(f"Failed to retrieve free users: {str(e)}", exc_info=True)
+            return APIResponse(status="failure", message=f"Failed to retrieve free users: {str(e)}")

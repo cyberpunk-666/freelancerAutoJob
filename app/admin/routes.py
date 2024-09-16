@@ -8,8 +8,21 @@ from app.utils.api_response import APIResponse
 admin_bp = Blueprint('admin', __name__)
 
 from app.utils.api_response import APIResponse
+from flask import render_template
 
-@admin_bp.route('/admin/data', methods=['GET'])
+@admin_bp.route('/dashboard')
+def dashboard():
+    return render_template('admin_dashboard.html')
+
+@admin_bp.route('/users')
+def users():
+    return render_template('admin_users.html')
+
+@admin_bp.route('/roles')
+def roles():
+    return render_template('admin_roles.html')
+
+@admin_bp.route('/data', methods=['GET'])
 @login_required
 def get_admin_data():
     db = get_db()

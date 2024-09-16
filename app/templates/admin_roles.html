@@ -1,0 +1,37 @@
+{% extends "layout.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<h1>Role Management</h1>
+
+<div id="roleList">
+    <h2>Roles</h2>
+    <ul id="roleListItems"></ul>
+    <input type="text" id="newRoleName" placeholder="New role name">
+    <button class="btn btn-primary" onclick="createRole()">Create Role</button>
+</div>
+
+<div id="roleDetails" style="display: none;">
+    <h2>Role Details</h2>
+    <h3 id="currentRoleName"></h3>
+    <button class="btn btn-primary" onclick="editRole()">Edit Role</button>
+    <button class="btn btn-primary" onclick="deleteRole()">Delete Role</button>
+
+    <h3>Users in Role</h3>
+    <ul id="usersInRole"></ul>
+    <select id="freeUsersList"></select>
+    <button class="btn btn-primary" onclick="addUserToRole()">Add User to Role</button>
+
+    <h3>Remove User from Role</h3>
+    <select id="roleUsersList"></select>
+    <button class="btn btn-primary" onclick="removeUserFromRole()">Remove User</button>
+</div>
+
+<div id="freeUsers">
+    <h2>Users without Role</h2>
+    <ul id="freeUserList"></ul>
+</div>
+<script src="{{ url_for('static', filename='js/roles.js') }}"></script>
+{% endblock %}
+

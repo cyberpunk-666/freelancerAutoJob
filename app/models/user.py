@@ -6,6 +6,13 @@ class User(UserMixin):
         self.email = email
         self.is_active = is_active
 
+    def __html__(self):
+        return {
+            'user_id': self.user_id,
+            'email': self.email,
+            'is_active': self.is_active
+        }
+
     def is_active(self):
         """Return whether the user is active."""
         return self.is_active
@@ -21,8 +28,8 @@ class User(UserMixin):
         cursor = db.cursor()
         cursor.execute("""
             SELECT 1 FROM user_roles ur
-            JOIN roles r ON ur.role_id = r.id
-            WHERE ur.user_id = ? AND r.name = ?
+            JOIN roles r ON ur.role_id = r.role_id
+            WHERE ur.user_id = ? AND r.role_name = ?
         """, (self.user_id, role_name))
         return cursor.fetchone() is not None
 

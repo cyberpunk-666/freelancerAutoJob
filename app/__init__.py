@@ -84,13 +84,15 @@ def create_app():
     from app.roles.routes import role_bp
     from app.roles.role_api import role_api_bp
     from app.setup.routes import setup_bp
-
+    from app.admin.routes import admin_bp
+    
     app.register_blueprint(user_bp, url_prefix='/user')
     app.register_blueprint(job_bp, url_prefix='/jobs')
     app.register_blueprint(role_bp, url_prefix='/roles')
     app.register_blueprint(role_api_bp, url_prefix='/api/roles')
     app.register_blueprint(user_api_bp, url_prefix='/api/users')
     app.register_blueprint(setup_bp)
+    app.register_blueprint(admin_bp, url_prefix='/admin')
     # Teardown database connection
     app.teardown_appcontext(close_db)
 

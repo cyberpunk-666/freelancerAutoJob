@@ -67,10 +67,9 @@ def initial_setup_post():
         return render_template('setup.html'), 500
 
     # Create admin user
-    hashed_password = generate_password_hash(password)
     admin_user_response = user_manager.create_user(
         email=email,
-        password=hashed_password,
+        password=password,
         is_active=True
     )
     if admin_user_response.status != "success":
@@ -79,12 +78,12 @@ def initial_setup_post():
 
     # Assign admin role to the user
     assign_role_response = role_manager.assign_role_to_user(
-        admin_user_response.data['user'].id,
-        admin_role_response.data['role'].id
+        admin_user_response.data['user_id'],
+        'admin'
     )
     if assign_role_response.status != "success":
         flash(assign_role_response.message, 'error')
         return render_template('setup.html'), 500
 
     flash('Initial setup completed successfully. You can now log in.', 'success')
-    return redirect(url_for('auth.login'))
+    return redirect(url_for('user.login'))

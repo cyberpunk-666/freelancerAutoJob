@@ -61,12 +61,20 @@ class PostgresDB:
         try:
             with self.connection.cursor() as cursor:
                 cursor.execute(query, params)
+                # Si la requête contient un INSERT, utiliser RETURNING pour obtenir l'ID
+                if "RETURNING" in query:
+                    last_id = cursor.fetchone()[0]
+                    self.connection.commit()
+                    self.logger.debug(f"Query executed successfully: {query}")
+                    return last_id
                 self.connection.commit()
                 self.logger.debug(f"Query executed successfully: {query}")
         except Exception as e:
             self.logger.error(f"Error executing query: {e}")
             self.connection.rollback()
             raise
+
+
 
     def fetch_one(self, query, params=None):
         """Fetch a single result from a query."""

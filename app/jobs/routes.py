@@ -11,8 +11,10 @@ from app.utils.job_application_processor import JobApplicationProcessor
 from app.utils.email_processor import EmailProcessor
 from app.utils.job_queue import JobQueue
 from app.utils.api_response import APIResponse
+from app.models.role_manager import RoleManager
 
 job_bp = Blueprint('jobs', __name__)
+
 
 @job_bp.route('/jobs')
 @login_required

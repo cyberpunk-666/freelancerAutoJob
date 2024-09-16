@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from app.utils.api_response import APIResponse
-
+from app.db.utils import get_db
 class JobManager:
     def __init__(self, db):
         self.db = db
@@ -10,20 +10,27 @@ class JobManager:
     def create_table(self) -> APIResponse:
         """Create the jobs and job_applications tables if they don't exist."""
         try:
-            create_jobs_table_query = """
-            CREATE TABLE IF NOT EXISTS jobs (
-                job_id SERIAL PRIMARY KEY,
-                title VARCHAR(255) NOT NULL,
-                description TEXT NOT NULL,
-                company VARCHAR(255) NOT NULL,
-                location VARCHAR(255) NOT NULL,
-                salary_range VARCHAR(255),
-                job_type VARCHAR(255) NOT NULL,
+            # Initialize the database
+            db = get_db()
+
+            # Example table creation SQL
+            create_table_query = """
+            CREATE TABLE IF NOT EXISTS job_details (
+                job_id VARCHAR(32) PRIMARY KEY, -- MD5 hash of job_title
+                job_title TEXT NOT NULL,
+                job_description TEXT,
+                budget VARCHAR(50),
+                email_date TIMESTAMP, -- When the job was received via email
+                gemini_results JSONB, -- JSON array/object of all Gemini results
+                status VARCHAR(50),
+                performance_metrics JSONB,
+                user_id INTEGER NOT NULL, -- User who posted the job
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """
-            self.db.execute_query(create_jobs_table_query)
 
+            # Create the table
+            db.create_table(create_table_query)
             create_job_applications_table_query = """
             CREATE TABLE IF NOT EXISTS job_applications (
                 application_id SERIAL PRIMARY KEY,

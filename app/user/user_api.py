@@ -21,7 +21,7 @@ def get_all_users():
 def get_user(user_id):
     db = get_db()
     user_manager = UserManager(db)
-    user_response = user_manager.get_user_by_id(user_id)
+    user_response = user_manager.get_user(user_id)
     return user_response.to_dict()
 
 @user_api_bp.route('/search', methods=['GET'])
@@ -71,3 +71,12 @@ def get_user_roles(user_id):
     user_manager = UserManager(db)
     roles_response = user_manager.get_user_roles(user_id)
     return roles_response.to_dict()
+
+@user_api_bp.route('/free', methods=['GET'])
+@login_required
+@role_required('admin')
+def get_free_users():
+    db = get_db()
+    user_manager = UserManager(db)
+    free_users_response = user_manager.get_free_users()
+    return free_users_response.to_dict()

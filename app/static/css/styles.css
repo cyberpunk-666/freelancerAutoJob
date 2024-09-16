@@ -1,124 +1,282 @@
-/* General Body Style */
+/* General Page Styling */
 body {
+    background-color: #1b1b1b;
+    color: #e6e6e6;
     font-family: Arial, sans-serif;
-    background-color: #121212;
-    color: #e0e0e0;
-    margin: 0;
-    padding: 20px;
 }
 
-/* Headings */
-h1 {
-    color: #f5f5f5;
-    border-bottom: 2px solid #f5f5f5;
-    padding-bottom: 10px;
-    margin-bottom: 20px;
+/* Sidebar */
+#sidebar {
+    background-color: #2d2d2d;
+    color: #fff;
+    min-width: 250px;
+    padding: 15px;
 }
-
-/* Links */
-a {
-    color: #81d4fa;
-    text-decoration: none;
+body {
+    display: flex;
 }
-
-a:hover {
-    text-decoration: underline;
+#sidebar {
+    min-width: 250px;
+    max-width: 250px;
+    background-color: #343a40;
+    padding: 15px;
 }
-
-/* Navbar */
-.navbar {
-    background-color: #1e1e1e;
-    border-bottom: 1px solid #333;
-}
-
-.navbar .navbar-brand {
-    color: #81d4fa;
-}
-
-.navbar .navbar-nav .nav-item .nav-link {
-    color: #e0e0e0;
-}
-
-.navbar .navbar-nav .nav-item .nav-link:hover {
-    color: #81d4fa;
-}
-
-/* Container */
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-    background-color: #1e1e1e;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-}
-
-/* Table Styles */
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 20px;
-}
-
-th, td {
-    padding: 12px 15px;
-    text-align: left;
-}
-
-th {
-    background-color: #1e1e1e;
-    color: #81d4fa;
-}
-
-tr:nth-child(even) {
-    background-color: #1e1e1e;
-}
-
-tr:nth-child(odd) {
-    background-color: #2c2c2c;
-}
-
-tr:hover {
-    background-color: #333;
-}
-
-/* Cards */
-.card {
-    background-color: #1e1e1e;
-    padding: 20px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-}
-
-.card h4 {
-    color: #81d4fa;
-}
-
-.card ul {
-    list-style: none;
-    padding: 0;
-}
-
-.card ul li {
+#sidebar .nav-link {
+    color: #fff;
     margin-bottom: 10px;
 }
+#content {
+    flex-grow: 1;
+    padding: 20px;
+}
+.navbar-brand {
+    color: #fff !important;
+}
 
-/* Back Link */
-.back-link {
-    display: inline-block;
-    background-color: #81d4fa;
-    color: #121212;
-    padding: 10px 20px;
+/* Navbar Links */
+.nav-link {
+    color: #e6e6e6;
+}
+
+.nav-link:hover {
+    background-color: #3a3a3a;
+    color: #fff;
+}
+
+/* Buttons */
+.btn {
+    background-color: #444;
+    border: 1px solid #555;
+    color: #e6e6e6;
+    border-radius: 4px;
+    padding: 10px 15px;
+}
+
+.btn-primary {
+    background-color: #287aff;
+    border-color: #1a61d8;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0056d2;
+    border-color: #0041a8;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    width: 40px;
+    height: 20px;
+    background-color: #666;
+    border-radius: 20px;
+    transition: background-color 0.3s;
+}
+
+.toggle-switch input[type="checkbox"] {
+    display: none;
+}
+
+.toggle-switch input[type="checkbox"]:checked + .slider {
+    background-color: #287aff;
+}
+
+.slider {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background-color: white;
+    border-radius: 50%;
+    transition: 0.3s;
+}
+
+input[type="checkbox"]:checked + .slider {
+    transform: translateX(20px);
+}
+
+/* Checkboxes */
+.checkbox {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.checkbox input[type="checkbox"] {
+    display: none;
+}
+
+.checkbox label {
+    position: relative;
+    padding-left: 30px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.checkbox label::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 20px;
+    height: 20px;
+    background-color: #444;
+    border-radius: 4px;
+    border: 2px solid #666;
+    transition: background-color 0.3s, border-color 0.3s;
+}
+
+.checkbox input[type="checkbox"]:checked + label::before {
+    background-color: #287aff;
+    border-color: #1a61d8;
+}
+
+.checkbox label::after {
+    content: "";
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    width: 10px;
+    height: 10px;
+    background-color: #fff;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.checkbox input[type="checkbox"]:checked + label::after {
+    opacity: 1;
+}
+
+/* Radio Buttons */
+.radio input[type="radio"] {
+    display: none;
+}
+
+.radio label {
+    position: relative;
+    padding-left: 30px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.radio label::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 20px;
+    height: 20px;
+    background-color: #444;
+    border-radius: 50%;
+    border: 2px solid #666;
+    transition: background-color 0.3s, border-color 0.3s;
+}
+
+.radio input[type="radio"]:checked + label::before {
+    background-color: #287aff;
+    border-color: #1a61d8;
+}
+
+.radio label::after {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 8px;
+    height: 8px;
+    background-color: #fff;
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.radio input[type="radio"]:checked + label::after {
+    opacity: 1;
+}
+
+/* Progress Bar */
+.progress-bar {
+    background-color: #444;
+    border-radius: 4px;
+    height: 20px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.progress-bar-inner {
+    background-color: #287aff;
+    height: 100%;
+    width: 0;
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+
+/* Input Fields */
+input[type="text"], input[type="password"], select {
+    background-color: #2d2d2d;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.3s;
+}
+
+input[type="text"]:focus, input[type="password"]:focus, select:focus {
+    border-color: #287aff;
+    outline: none;
+}
+
+/* Date Picker */
+.datepicker {
+    background-color: #2d2d2d;
+    border: 1px solid #555;
+    color: #fff;
+    border-radius: 4px;
+    padding: 5px;
+}
+
+.datepicker .day:hover {
+    background-color: #444;
+    border-radius: 50%;
+}
+
+.datepicker .selected-day {
+    background-color: #287aff;
+    color: white;
+    border-radius: 50%;
+}
+
+/* Modal */
+.modal-content {
+    background-color: #2d2d2d;
+    border: none;
+    color: #e6e6e6;
+}
+
+.modal-header, .modal-footer {
+    border: none;
+}
+
+.modal-header h4 {
+    color: #287aff;
+}
+
+.modal-close {
+    color: #fff;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background-color: #444;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: #287aff;
     border-radius: 5px;
-    text-decoration: none;
-    margin-top: 20px;
-    transition: background-color 0.3s ease;
-}
-
-.back-link:hover {
-    background-color: #4f9ccf;
-}
-.pending-job {
-    background-color: lightgray;
 }

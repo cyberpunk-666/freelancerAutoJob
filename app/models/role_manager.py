@@ -33,12 +33,12 @@ class RoleManager:
         """Create a new role."""
         self.logger.info(f"Creating role: {role_name}")
         try:
-            self.db.execute_query(
+            role_id = self.db.execute_query(
                 "INSERT INTO roles (role_name) VALUES (%s)",
                 (role_name,)
             )
             self.logger.info(f"Role '{role_name}' created successfully")
-            return APIResponse(status="success", message=f"Role '{role_name}' created successfully")
+            return APIResponse(status="success", message=f"Role '{role_name}' created successfully", data={"role_id": role_id})
         except Exception as e:
             self.logger.error(f"Failed to create role '{role_name}': {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to create role '{role_name}'")

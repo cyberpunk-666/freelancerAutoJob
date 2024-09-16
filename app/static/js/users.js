@@ -6,8 +6,8 @@ async function getAllUsers() {
             throw new Error('Failed to fetch users');
         }
         const data = await response.json();
-        if (data.success) {
-            return data.data;
+        if (data.status == "success") {
+            return data.data.users;
         } else {
             throw new Error(data.message || 'Failed to fetch users');
         }
@@ -25,7 +25,7 @@ async function getUser(userId) {
             throw new Error('Failed to fetch user');
         }
         const data = await response.json();
-        if (data.success) {
+        if (data.status == "success") {
             return data.data;
         } else {
             throw new Error(data.message || 'Failed to fetch user');
@@ -44,7 +44,7 @@ async function searchUsers(query) {
             throw new Error('Failed to search users');
         }
         const data = await response.json();
-        if (data.success) {
+        if (data.status == "success") {
             return data.data;
         } else {
             throw new Error(data.message || 'Failed to search users');
@@ -69,7 +69,7 @@ async function createUser(userData) {
             throw new Error('Failed to create user');
         }
         const data = await response.json();
-        if (data.success) {
+        if (data.status == "success") {
             return data.data;
         } else {
             throw new Error(data.message || 'Failed to create user');
@@ -94,7 +94,7 @@ async function updateUser(userId, userData) {
             throw new Error('Failed to update user');
         }
         const data = await response.json();
-        if (data.success) {
+        if (data.status == "success") {
             return data.data;
         } else {
             throw new Error(data.message || 'Failed to update user');
@@ -115,7 +115,7 @@ async function deleteUser(userId) {
             throw new Error('Failed to delete user');
         }
         const data = await response.json();
-        if (data.success) {
+        if (data.status == "success") {
             return data.data;
         } else {
             throw new Error(data.message || 'Failed to delete user');
@@ -134,7 +134,7 @@ async function getUserRoles(userId) {
             throw new Error('Failed to fetch user roles');
         }
         const data = await response.json();
-        if (data.success) {
+        if (data.status == "success") {
             return data.data;
         } else {
             throw new Error(data.message || 'Failed to fetch user roles');
