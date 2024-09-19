@@ -1,7 +1,8 @@
 // Function to get all users
-async function getAllUsers() {
+async function getAllUsers(params) {
     try {
-        const response = await fetch('/api/users');
+        const queryString = new URLSearchParams(params).toString();
+        const response = await fetch(`/api/users?${queryString}`);
         if (!response.ok) {
             throw new Error('Failed to fetch users');
         }

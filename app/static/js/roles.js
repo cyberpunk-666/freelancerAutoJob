@@ -12,13 +12,13 @@ async function loadRoles() {
         if (apiResponse.status === 'success') {
             const roles = apiResponse.data;
             
-            const roleList = document.getElementById('roleList');
-            roleList.innerHTML = '';
+            const roleListItems = document.getElementById('roleListItems');
+            roleListItems.innerHTML = '';
             roles.forEach(roleName => {
                 const li = document.createElement('li');
                 li.textContent = roleName;
                 li.onclick = () => selectRole(roleName);
-                roleList.appendChild(li);
+                roleListItems.appendChild(li);
             });
         } else {
             throw new Error(apiResponse.message);
@@ -34,11 +34,20 @@ async function createRole() {
     const newRoleName = document.getElementById('newRoleName').value.trim();
     if (newRoleName) {
         try {
+            const response = await fetch('/api/roles', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: newRoleName }),
+            });
+
             if (!response.ok) {
                 throw new Error('Failed to create role');
             }
+
             const apiResponse = await response.json();
-            
+
             if (apiResponse.status === 'success') {
                 await loadRoles();
                 document.getElementById('newRoleName').value = '';
@@ -66,7 +75,7 @@ async function selectRole(roleName) {
             document.getElementById('currentRoleName').textContent = roleName;
             document.getElementById('roleDetails').style.display = 'block';
             await loadUsersInRole(roleName);
-            await loadFreeUsers();
+            await loadFreeUsers(roleName);
         } else {
             throw new Error(apiResponse.message);
         }
@@ -152,12 +161,12 @@ async function loadUsersInRole(roleName) {
             
             users.forEach(user => {
                 const li = document.createElement('li');
-                li.textContent = `${user.name} (${user.email})`;
+                li.textContent = `${user[1]}`;
                 usersInRole.appendChild(li);
 
                 const option = document.createElement('option');
-                option.value = user.id;
-                option.textContent = user.name;
+                option.value = user[0];
+                option.textContent = user[1];
                 roleUsersList.appendChild(option);
             });
         } else {
@@ -169,41 +178,58 @@ async function loadUsersInRole(roleName) {
     }
 }
 
-// Load and display users not assigned to any role
-async function loadFreeUsers() {
+async function loadFreeUsers(role = null) {
     try {
-        const response = await fetch('/api/users/free');
-        if (!response.ok) {
-            throw new Error('Failed to fetch free users');
+        // Fetch users not in any role
+        const freeUserResponse = await fetch('/api/users/free');
+        if (!freeUserResponse.ok) {
+            throw new Error('Failed to fetch free users (unassigned)');
         }
-        const apiResponse = await response.json();
+        const freeUserApiResponse = await freeUserResponse.json();
         
-        if (apiResponse.status === 'success') {
-            const freeUsers = apiResponse.data;
-            
-            const freeUserList = document.getElementById('freeUserList');
-            const freeUsersList = document.getElementById('freeUsersList');
-            freeUserList.innerHTML = '';
-            freeUsersList.innerHTML = '';
-            
-            freeUsers.users.forEach(user => {
-                const li = document.createElement('li');
-                li.textContent = `${user.name} (${user.email})`;
-                freeUserList.appendChild(li);
+        if (freeUserApiResponse.status === 'success') {
+            const freeUserListElement = document.getElementById('freeUserList');
+            freeUserListElement.innerHTML = '';
 
-                const option = document.createElement('option');
-                option.value = user.id;
-                option.textContent = user.name;
-                freeUsersList.appendChild(option);
+            freeUserApiResponse.data.users.forEach(user => {
+                user = JSON.parse(user);
+                const li = document.createElement('li');
+                li.textContent = `${user.email}`;
+                freeUserListElement.appendChild(li);
             });
         } else {
-            throw new Error(apiResponse.message);
+            throw new Error(freeUserApiResponse.message);
+        }
+
+        // If a role is specified, fetch users not assigned to that role
+        if (role) {
+            const freeUsersListResponse = await fetch(`/api/users/free?role=${role}`);
+            if (!freeUsersListResponse.ok) {
+                throw new Error(`Failed to fetch free users for role ${role}`);
+            }
+            const freeUsersListApiResponse = await freeUsersListResponse.json();
+
+            if (freeUsersListApiResponse.status === 'success') {
+                const freeUsersListElement = document.getElementById('freeUsersList');
+                freeUsersListElement.innerHTML = '';
+
+                freeUsersListApiResponse.data.users.forEach(user => {
+                    user = JSON.parse(user);
+                    const option = document.createElement('option');
+                    option.value = user.user_id;
+                    option.textContent = user.email;
+                    freeUsersListElement.appendChild(option);
+                });
+            } else {
+                throw new Error(freeUsersListApiResponse.message);
+            }
         }
     } catch (error) {
         console.error('Error loading free users:', error);
         alert('Failed to load free users. Please try again.');
     }
 }
+
 
 // Add a user to the current role
 async function addUserToRole() {
@@ -224,7 +250,7 @@ async function addUserToRole() {
             
             if (apiResponse.status === 'success') {
                 await loadUsersInRole(currentRoleName);
-                await loadFreeUsers();
+                await loadFreeUsers(currentRoleName);
             } else {
                 throw new Error(apiResponse.message);
             }
@@ -250,7 +276,7 @@ async function removeUserFromRole() {
             
             if (apiResponse.status === 'success') {
                 await loadUsersInRole(currentRoleName);
-                await loadFreeUsers();
+                await loadFreeUsers(currentRoleName);
             } else {
                 throw new Error(apiResponse.message);
             }

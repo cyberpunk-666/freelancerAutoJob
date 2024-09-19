@@ -4,14 +4,17 @@ import os
 import re
 from datetime import datetime
 import logging
+
+from psycopg2 import DatabaseError
 from app.models.user import User
 from flask_login import UserMixin
+from flask import jsonify
 from flask import url_for, render_template
-from app.utils.email_sender import EmailSender
+from app.services.email_sender import EmailSender
 import secrets
 import bcrypt
 from app.utils.crypto import Crypto
-from app.utils.api_response import APIResponse
+from app.models.api_response import APIResponse
 class UserManager(UserMixin):
     def __init__(self, db):
         self.db = db
@@ -119,10 +122,10 @@ class UserManager(UserMixin):
         """Retrieve a user's information by user_id and return a User object."""
         self.logger.info(f"Retrieving user with ID: {user_id}")
         try:
-            query = "SELECT user_id, email, is_active FROM users WHERE user_id = %s"
+            query = "SELECT user_id, email, is_active, email_verified, last_login FROM users WHERE user_id = %s"
             result = self.db.fetch_one(query, (user_id,))
             if result:
-                user = User(user_id=result[0], email=result[1], is_active=result[2])
+                user = User(user_id=result[0], email=result[1], is_active=result[2], email_verified=result[3], last_login=result[4])
                 self.logger.info(f"User retrieved successfully: {user.email}")
                 return APIResponse(status="success", message="User retrieved successfully", data={"user": user})
             else:
@@ -183,11 +186,11 @@ class UserManager(UserMixin):
             self.logger.error(f"Password reset failed for {email}: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Password reset failed for {email}: {str(e)}")
 
-    def get_all_users(self, active_only=True) -> APIResponse:
+    def get_all_users(self, show_inactive=False) -> APIResponse:
         """Retrieve all users, optionally filtering by active status."""
-        self.logger.info(f"Retrieving {'active' if active_only else 'all'} users")
+        self.logger.info(f"Retrieving {'active' if not show_inactive else 'all'} users")
         try:
-            if active_only:
+            if not show_inactive:
                 query = "SELECT user_id, email, created_at FROM users WHERE is_active = TRUE"
             else:
                 query = "SELECT user_id, email, created_at FROM users"
@@ -515,14 +518,61 @@ class UserManager(UserMixin):
             offset = (page - 1) * page_size
             users = []
             results = self.db.fetch_all(
-                "SELECT * FROM users WHERE user_id NOT IN (SELECT user_id FROM user_roles) LIMIT %s OFFSET %s",
+                "SELECT user_id, email, is_active FROM users WHERE user_id NOT IN (SELECT user_id FROM user_roles) LIMIT %s OFFSET %s",
                 (page_size, offset)
             )
             for result in results:
-                user = UserManager(*result)
-                users.append(user)
+                user = User(*result)
+                users.append(user.toJson())
             self.logger.info(f"Retrieved {len(users)} free users successfully")
             return APIResponse(status="success", message="Free users retrieved successfully", data={"users": users})
         except Exception as e:
             self.logger.error(f"Failed to retrieve free users: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to retrieve free users: {str(e)}")
+        
+    def get_free_users_by_role(self, role_name=None, page=1, page_size=10):
+        if role_name:
+            self.logger.info(f"Retrieving users not in role: {role_name}")
+        else:
+            self.logger.info("Retrieving users not in any role")
+            
+        try:
+            offset = (page - 1) * page_size
+            users = []
+            
+            if role_name:
+                # Query for users not in the specified role
+                query = """
+                    SELECT u.user_id, u.email, u.is_active 
+                    FROM users u 
+                    WHERE u.user_id NOT IN (
+                        SELECT ur.user_id 
+                        FROM user_roles ur 
+                        JOIN roles r ON ur.role_id = r.role_id 
+                        WHERE r.role_name = %s
+                    )
+                    LIMIT %s OFFSET %s
+                """
+                results = self.db.fetch_all(query, (role_name, page_size, offset))
+            else:
+                # Query for users not assigned to any role
+                query = """
+                    SELECT u.user_id, u.email, u.is_active 
+                    FROM users u 
+                    WHERE u.user_id NOT IN (SELECT ur.user_id FROM user_roles ur)
+                    LIMIT %s OFFSET %s
+                """
+                results = self.db.fetch_all(query, (page_size, offset))
+            
+            for result in results:
+                user = User(*result)
+                users.append(user.toJson())
+
+            message = f"Users not in role {role_name}" if role_name else "Users not assigned to any role"
+            self.logger.info(f"Retrieved {len(users)} {message}")
+            return APIResponse(status="success", message=f"{message} retrieved successfully", data={"users": users})
+        
+        except Exception as e:
+            error_message = f"Failed to retrieve users {f'not in role {role_name}' if role_name else 'not assigned to any role'}: {str(e)}"
+            self.logger.error(error_message, exc_info=True)
+            return APIResponse(status="failure", message=error_message)

@@ -10,6 +10,12 @@
     <ul id="userListItems"></ul>
     <input type="text" id="searchInput" placeholder="Search users">
     <button class="btn btn-primary" onclick="performSearch()">Search</button>
+    
+    <!-- Checkbox to filter inactive users -->
+    <label>
+        <input type="checkbox" id="showInactive" onchange="loadUsers()">Also show inactive users
+    </label>
+    
 </div>
 
 <div id="userForm">
@@ -23,21 +29,37 @@
 
 <div id="userDetails" style="display: none;">
     <h2>User Details</h2>
-    <h3 id="currentUserName"></h3>
-    <p id="currentUserEmail"></p>
-    <button class="btn btn-primary" onclick="editCurrentUser()">Edit User</button>
+    
+    <!-- Hidden userId field -->
+    <input type="hidden" id="userId">
+    
+    <h3 id="currentUserEmail"></h3>
+
+    <p>Is Active: <input type="checkbox" id="isActive" disabled></p>
+    <p>Email Verified: <input type="checkbox" id="emailVerified" disabled></p>
+    <p>Last Login: <span id="lastLogin"></span></p>
+
+    <!-- Buttons -->
+    <button class="btn btn-primary" id="editUserButton" onclick="toggleEditMode()">Edit User</button>
+    <button class="btn btn-success" id="saveUserButton" style="display: none;" onclick="saveEditedUser()">Save Changes</button>
     <button class="btn btn-danger" onclick="deleteCurrentUser()">Delete User</button>
 
     <h3>User Roles</h3>
     <ul id="userRoles"></ul>
 </div>
 
+
+
+
 <script src="{{ url_for('static', filename='js/users.js') }}"></script>
 <script>
 // Function to load all users
 async function loadUsers() {
+    const showInactive = document.getElementById('showInactive').checked;
+
     try {
-        const users = await getAllUsers();
+        // Pass the showInactive flag to the backend
+        const users = await getAllUsers({ show_inactive: showInactive });
         const userList = document.getElementById('userListItems');
         userList.innerHTML = '';
         users.forEach(user => {
@@ -52,14 +74,27 @@ async function loadUsers() {
     }
 }
 
+
 // Function to show user details
 async function showUserDetails(userId) {
     try {
-        const user = await getUser(userId);
-        document.getElementById('currentUserName').textContent = user.name;
+        let user = await getUser(userId);
+        user = JSON.parse(user.user)
+        // Store userId in the hidden input field for later use
+        document.getElementById('userId').value = user.user_id;
+
+        // Display the user's details
         document.getElementById('currentUserEmail').textContent = user.email;
+        document.getElementById('isActive').checked = user.is_active;
+        document.getElementById('emailVerified').checked = user.email_verified;
+        document.getElementById('lastLogin').textContent = user.last_login;
+
         document.getElementById('userDetails').style.display = 'block';
-        
+
+        // Initially, fields are read-only
+        document.getElementById('isActive').disabled = true;
+        document.getElementById('emailVerified').disabled = true;
+
         // Load user roles
         const roles = await getUserRoles(userId);
         const rolesList = document.getElementById('userRoles');
@@ -75,23 +110,18 @@ async function showUserDetails(userId) {
     }
 }
 
-// Function to perform user search
-async function performSearch() {
-    const query = document.getElementById('searchInput').value;
-    try {
-        const users = await searchUsers(query);
-        const userList = document.getElementById('userListItems');
-        userList.innerHTML = '';
-        users.forEach(user => {
-            const li = document.createElement('li');
-            li.textContent = user.name;
-            li.onclick = () => showUserDetails(user.user_id);
-            userList.appendChild(li);
-        });
-    } catch (error) {
-        console.error('Error searching users:', error);
-        alert('Failed to search users. Please try again.');
-    }
+
+
+// Function to edit the current user (populate form with user details for editing)
+function editCurrentUser() {
+    const userId = document.getElementById('userId').value;
+    const userName = document.getElementById('currentUserName').textContent;
+    const userEmail = document.getElementById('currentUserEmail').textContent;
+
+    document.getElementById('userId').value = userId;
+    document.getElementById('userName').value = userName;
+    document.getElementById('userEmail').value = userEmail;
+    document.getElementById('userPassword').value = ''; // Clear password field for security
 }
 
 // Function to save (create or update) a user
@@ -100,7 +130,9 @@ async function saveUser() {
     const userData = {
         name: document.getElementById('userName').value,
         email: document.getElementById('userEmail').value,
-        password: document.getElementById('userPassword').value
+        password: document.getElementById('userPassword').value,
+        is_active: document.getElementById('isActive').checked,  // Added
+        email_verified: document.getElementById('emailVerified').checked  // Added
     };
 
     try {
@@ -117,18 +149,6 @@ async function saveUser() {
         console.error('Error saving user:', error);
         alert('Failed to save user. Please try again.');
     }
-}
-
-// Function to edit the current user
-function editCurrentUser() {
-    const userId = document.getElementById('userId').value;
-    const userName = document.getElementById('currentUserName').textContent;
-    const userEmail = document.getElementById('currentUserEmail').textContent;
-
-    document.getElementById('userId').value = userId;
-    document.getElementById('userName').value = userName;
-    document.getElementById('userEmail').value = userEmail;
-    document.getElementById('userPassword').value = ''; // Clear password field for security
 }
 
 // Function to delete the current user
@@ -154,9 +174,93 @@ function clearUserForm() {
     document.getElementById('userName').value = '';
     document.getElementById('userEmail').value = '';
     document.getElementById('userPassword').value = '';
+    document.getElementById('isActive').checked = false;  // Clear active checkbox
+    document.getElementById('emailVerified').checked = false;  // Clear email verified checkbox
+    document.getElementById('lastLogin').textContent = '';  // Clear last login info
+}
+
+// Function to perform user search
+async function performSearch() {
+    const query = document.getElementById('searchInput').value;
+    const showInactive = document.getElementById('showInactive').checked;
+
+    try {
+        // Pass the search query and showInactive flag to the backend
+        const users = await searchUsers({ query: query, show_inactive: showInactive });
+        const userList = document.getElementById('userListItems');
+        userList.innerHTML = '';
+        users.forEach(user => {
+            const li = document.createElement('li');
+            li.textContent = user.email;
+            li.onclick = () => showUserDetails(user.user_id);
+            userList.appendChild(li);
+        });
+    } catch (error) {
+        console.error('Error searching users:', error);
+        alert('Failed to search users. Please try again.');
+    }
+}
+
+
+function toggleEditMode() {
+    const isActiveField = document.getElementById('isActive');
+    const emailVerifiedField = document.getElementById('emailVerified');
+    
+    const editButton = document.getElementById('editUserButton');
+    const saveButton = document.getElementById('saveUserButton');
+    
+    // Toggle fields between editable and non-editable
+    if (isActiveField.disabled) {
+        isActiveField.disabled = false;
+        emailVerifiedField.disabled = false;
+        editButton.style.display = 'none';
+        saveButton.style.display = 'inline';
+    } else {
+        isActiveField.disabled = true;
+        emailVerifiedField.disabled = true;
+        editButton.style.display = 'inline';
+        saveButton.style.display = 'none';
+    }
+}
+async function saveEditedUser() {
+    // Get the userId from the hidden input field
+    const userId = document.getElementById('userId').value;
+    const userData = {
+        is_active: document.getElementById('isActive').checked,
+        email_verified: document.getElementById('emailVerified').checked,
+    };
+
+    try {
+        await updateUser(userId, userData);  // Sends a PUT or PATCH request to the server
+        alert('User updated successfully');
+        
+        // Toggle back to view mode
+        toggleEditMode();
+        loadUsers();  // Reload the user list to reflect changes
+    } catch (error) {
+        console.error('Error updating user:', error);
+        alert('Failed to update user. Please try again.');
+    }
+}
+
+async function updateUser(userId, userData) {
+    const response = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',  // Or PATCH depending on your API design
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to update user');
+    }
+
+    return await response.json();
 }
 
 // Load users when the page loads
 window.onload = loadUsers;
+
 </script>
 {% endblock %}

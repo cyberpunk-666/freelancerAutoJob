@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from app.db.postgresdb import PostgresDB
 import logging
-from app.utils.api_response import APIResponse
+from app.models.api_response import APIResponse
 
 class ProcessedEmailManager:
     def __init__(self, db: PostgresDB, user_id):

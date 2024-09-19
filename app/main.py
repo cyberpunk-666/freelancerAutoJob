@@ -2,20 +2,28 @@ import threading
 from app import create_app
 from flask import Blueprint, render_template, redirect, url_for, flash
 import logging
-from app.config.config import setup_logging
+from app.models.config import setup_logging
 from flask_talisman import Talisman
 from werkzeug.middleware.proxy_fix import ProxyFix
 import os
-from app.models.job_manager import JobManager
-from app.utils.job_queue import JobQueue
-from app.utils.job_application_processor import JobApplicationProcessor
-from app.models.user_manager import UserManager
-from app.models.role_manager import RoleManager
-from app.db.utils import get_db
+from app.managers.job_manager import JobManager
+from app.services.job_queue import JobQueue
+from app.services.job_application_processor import JobApplicationProcessor
+from app.managers.user_manager import UserManager
+from app.managers.role_manager import RoleManager
+from app.db.db_utils import get_db
+from app.models.user import User
+import json
+
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if hasattr(obj, 'to_dict'):
+            return obj.to_dict()
+        return super().default(obj)
 
 setup_logging()
 app = create_app()
-
+app.json_encoder = CustomJSONEncoder
 Talisman(app, content_security_policy=None)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
@@ -48,9 +56,10 @@ if __name__ == '__main__':
     app.logger.info("Starting app...")
     # Run the app
     if os.getenv('FLASK_ENV') == 'development':
-        queue_url = os.getenv('AWS_SQS_QUEUE_URL')
+        # queue_url = os.getenv('AWS_SQS_QUEUE_URL')
         # Create job queue and processor
-        job_queue = JobQueue(queue_url)
+        # job_queue = JobQueue(queue_url)
+        # job_queue.add_job(1,1)
         # job_manager = JobManager()
         # job_processor = JobApplicationProcessor()
 

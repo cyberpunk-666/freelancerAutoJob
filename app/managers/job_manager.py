@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
-from app.utils.api_response import APIResponse
-from app.db.utils import get_db
+from app.models.api_response import APIResponse
+from app.db.db_utils import get_db
 class JobManager:
     def __init__(self, db):
         self.db = db

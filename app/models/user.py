@@ -1,17 +1,20 @@
 from flask_login import UserMixin
+import json
 
+"""
+This class represents a user in the system.
+It inherits from UserMixin, which is a class provided by Flask-Login for handling user authentication.
+"""
 class User(UserMixin):
-    def __init__(self, user_id, email, is_active):
+    def __init__(self, user_id, email, is_active = True, email_verified = True, last_login = None):
         self.user_id = user_id
         self.email = email
         self.is_active = is_active
+        self.email_verified = email_verified
+        self.last_login = last_login
 
-    def __html__(self):
-        return {
-            'user_id': self.user_id,
-            'email': self.email,
-            'is_active': self.is_active
-        }
+    def toJson(self):
+        return json.dumps(self, default=lambda o: o.__dict__)
 
     def is_active(self):
         """Return whether the user is active."""
@@ -21,25 +24,3 @@ class User(UserMixin):
         """Return the user_id as the unique identifier for Flask-Login."""
         return str(self.user_id)
 
-    def has_role(self, role_name):
-        # We'll implement this method using your existing database structure
-        from app.db.utils import get_db
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute("""
-            SELECT 1 FROM user_roles ur
-            JOIN roles r ON ur.role_id = r.role_id
-            WHERE ur.user_id = ? AND r.role_name = ?
-        """, (self.user_id, role_name))
-        return cursor.fetchone() is not None
-
-    @staticmethod
-    def get(user_id):
-        from app.db.utils import get_db
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute("SELECT id, email, is_active FROM users WHERE id = ?", (user_id,))
-        user_data = cursor.fetchone()
-        if user_data:
-            return User(user_data['id'], user_data['email'], user_data['is_active'])
-        return None

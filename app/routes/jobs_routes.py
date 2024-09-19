@@ -1,17 +1,17 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
-from app.jobs.forms import CreateJobForm, UpdateJobForm
-from app.models.job_manager import JobManager
+from app.forms.jobs_forms import CreateJobForm, UpdateJobForm
+from app.managers.job_manager import JobManager
 from app.db.postgresdb import PostgresDB
-from app.db.utils import get_db
+from app.db.db_utils import get_db
 import markdown 
 import logging
 from flask import jsonify, request
-from app.utils.job_application_processor import JobApplicationProcessor
-from app.utils.email_processor import EmailProcessor
-from app.utils.job_queue import JobQueue
-from app.utils.api_response import APIResponse
-from app.models.role_manager import RoleManager
+from app.services.job_application_processor import JobApplicationProcessor
+from app.services.email_processor import EmailProcessor
+from app.services.job_queue import JobQueue
+from app.models.api_response import APIResponse
+from app.managers.role_manager import RoleManager
 
 job_bp = Blueprint('jobs', __name__)
 
@@ -118,9 +118,7 @@ def job_detail(job_id):
 
 @job_bp.route('/fetch_jobs', methods=['POST'])
 def fetch_jobs():
-    db = get_db()
-    job_manager = JobManager(db)
-    email_processor = EmailProcessor(job_manager)
+    email_processor = EmailProcessor()
     api_response = email_processor.fetch_jobs_from_email(current_user.user_id)
 
     if api_response.status == "success":

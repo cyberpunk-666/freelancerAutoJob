@@ -1,4 +1,6 @@
 import poplib
+
+from app.services.job_application_processor import JobApplicationProcessor
 poplib._MAXLINE = 8192
 from email import parser
 import re
@@ -15,13 +17,15 @@ import time
 from email.utils import parsedate_to_datetime
 import ssl
 from urllib.parse import urlparse, urlunparse
-from app.utils.api_response import APIResponse
+from app.models.api_response import APIResponse
 import logging
-from app.models.processed_email_manager import ProcessedEmailManager
-from app.db.utils import get_db
-from app.models.job_manager import JobManager
+from app.managers.processed_email_manager import ProcessedEmailManager
+from app.db.db_utils import get_db
+from app.managers.job_manager import JobManager
 import ssl
 import time
+import imaplib
+import smtplib
 
 class APIResponse:
     def __init__(self, status: str, message: str, data: dict = None):
@@ -29,26 +33,82 @@ class APIResponse:
         self.message = message
         self.data = data or {}
 
+
 class EmailProcessor:
-    def __init__(self, mailbox, target_sender, job_link_prefix, logger, job_manager):
-        self.mailbox = mailbox
-        self.target_sender = target_sender
-        self.job_link_prefix = job_link_prefix
-        self.logger = logger
-        self.job_manager = job_manager
-        self.num_messages_to_read = 10
-        
-    def connect_to_mailbox(self) -> APIResponse:
+    def __init__(self):
+        self.logger = logging.getLogger()
+        db = get_db()
+        self.job_manager = JobManager(db)
+
+        # Email configuration
+        self.email_address = os.environ.get('EMAIL_USERNAME')
+        self.email_password = os.environ.get('EMAIL_PASSWORD')
+        self.pop3_server = os.environ.get('POP3_SERVER')
+        self.pop3_port = int(os.environ.get('POP3_PORT'))
+        self.connection_type = os.environ.get('CONNECTION_TYPE').lower()
+        # Job fetching and processing configuration
+        self.num_messages_to_read = int(os.environ.get('NUM_MESSAGES_TO_READ', 10))
+        self.target_sender = os.environ.get('TARGET_SENDER')
+        self.job_link_prefix = os.environ.get('JOB_LINK_PREFIX')
+
+        # Instantiate the mailbox object
+        self.mailbox = None
+
+
+
+    def is_connected(self):
+        if isinstance(self.mailbox, imaplib.IMAP4):
+            try:
+                status = self.mailbox.noop()[0]
+                return status == 'OK'
+            except:
+                return False
+        elif isinstance(self.mailbox, poplib.POP3):
+            try:
+                status = self.mailbox.noop()
+                return True
+            except:
+                return False
+        elif isinstance(self.mailbox, smtplib.SMTP):
+            try:
+                status = self.mailbox.noop()[0]
+                return status == 250
+            except:
+                return False
+        else:
+            return False
+
+    def establish_mailbox_connection(self):
+        # Check if already connected
+        if self.is_connected():
+            print(f"Already connected to {self.connection_type} server")
+            return
+
+        # If not connected, establish a new connection
         try:
-            # Connect to the mailbox
-            self.mailbox.login(self.email_address, self.email_password)
-            self.mailbox.select("inbox")
-            self.logger.info("Connected to mailbox")
-            return APIResponse(status="success", message="Connected to mailbox")
+            if self.connection_type == 'imap':
+                self.mailbox = imaplib.IMAP4_SSL(self.pop3_server, self.pop3_port)
+                self.mailbox.login(self.email_address, self.email_password)
+            elif self.connection_type == 'pop3':
+                self.mailbox = poplib.POP3_SSL(self.pop3_server, self.pop3_port)
+                self.mailbox.user(self.email_address)
+                self.mailbox.pass_(self.email_password)
+            elif self.connection_type == 'smtp':
+                self.mailbox = smtplib.SMTP(self.pop3_server, self.pop3_port)
+                self.mailbox.starttls()
+                self.mailbox.login(self.email_address, self.email_password)
+            else:
+                raise ValueError("Unsupported connection type")
+
+            if self.is_connected():
+                print(f"Successfully connected to {self.connection_type} server")
+            else:
+                print(f"Failed to connect to {self.connection_type} server")
+                self.mailbox = None
         except Exception as e:
-            self.logger.error(f"Failed to connect to mailbox: {e}")
-            return APIResponse(status="failure", message="Failed to connect to mailbox")
-        
+            print(f"Error connecting to {self.connection_type} server: {str(e)}")
+            self.mailbox = None
+            
     def extract_links_from_body(self, body: str) -> APIResponse:
         self.logger.debug("Extracting links from email body")
         try:
@@ -99,7 +159,17 @@ class EmailProcessor:
             self.logger.error(f"Error extracting job budget from HTML: {e}")
             return APIResponse(status="failure", message="Error extracting job budget from HTML")   
 
-    def process_message(self, message, user_id) -> APIResponse:
+    def extract_jobs_from_email(self, message, user_id) -> APIResponse:       
+        """
+        Extract job links and details from an email message, process the job if found, and ensure it's stored in the database.
+
+        Args:
+            message (email.message.Message): The email message object to process.
+            user_id (str): The ID of the user who owns the email.
+
+        Returns:
+            APIResponse: A response with the status of job extraction and processing, including job details if successful.
+        """
         seen_jobs = set()
         if self.target_sender in message['from']:
             payload = message.get_payload()
@@ -177,7 +247,18 @@ class EmailProcessor:
 
         return APIResponse(status="success", message="No new jobs found")
 
-    def fetch_email(self, index, user_id, max_retries=3) -> APIResponse:
+    def retrieve_email_jobs(self, index, user_id, max_retries=3) -> APIResponse:
+        """
+        Retrieve the jobs in an email by index from the mailbox, ensuring it's not already processed.
+
+        Args:
+            index (int): The index of the email to fetch.
+            user_id (str): The ID of the user requesting the email.
+            max_retries (int): The maximum number of retry attempts in case of failure (default: 3).
+
+        Returns:
+            APIResponse: A response object indicating the status of the operation and email details, if successful.
+        """
         self.logger.debug("Fetching email %d", index)
         retries = 0
 
@@ -196,7 +277,7 @@ class EmailProcessor:
                     return APIResponse(status="success", message="Email already processed")
 
                 # Process the message and return the APIResponse
-                return self.process_message(message, user_id)
+                return self.extract_jobs_from_email(message, user_id)
 
             except ssl.SSLError as e:
                 retries += 1
@@ -217,12 +298,23 @@ class EmailProcessor:
         self.logger.error(f"Failed to fetch email {index} after {max_retries} attempts.")
         return APIResponse(status="failure", message=f"Failed to fetch email {index} after {max_retries} attempts")
 
-    def fetch_and_process_email(self, index, user_id, job_application_processor) -> APIResponse:
+    def fetch_and_process_email(self, index, user_id) -> APIResponse:
+        """
+        Retrieve an email by index, process its content, and handle job extraction if applicable.
+
+        Args:
+            index (int): The index of the email to retrieve and process.
+            user_id (str): The ID of the user.
+
+        Returns:
+            APIResponse: A response indicating the result of email processing and job extraction.
+        """
         self.logger.debug(f"Fetching and processing email {index}")
-        result = self.fetch_email(index, user_id)
+        result = self.retrieve_email_jobs(index, user_id)
         if result.status == "success" and "job_id" in result.data:
             job = result.data
             try:
+                job_application_processor = JobApplicationProcessor(get_db())
                 job_application_processor.process_job(job)
                 pem = ProcessedEmailManager(get_db(), user_id)
                 pem.mark_email_as_processed(job["message_id"], user_id)
@@ -233,8 +325,22 @@ class EmailProcessor:
         else:
             self.logger.warning(f"Skipping email {index} due to errors or no jobs found.")
             return result
+
         
-    def process_email_jobs(self, jobs, message_id, job_application_processor, user_id) -> APIResponse:
+    def handle_extracted_jobs(self, jobs, message_id, job_application_processor, user_id) -> APIResponse:
+        """
+        Process a list of job data extracted from an email and mark the email as processed upon success.
+
+        Args:
+            jobs (list): List of job data to process.
+            message_id (str): The ID of the processed email.
+            job_application_processor (JobApplicationProcessor): Processor object to handle job applications.
+            user_id (str): The ID of the user associated with the jobs.
+
+        Returns:
+            APIResponse: A response indicating the result of job processing, including any failed jobs.
+        """
+
         failed_jobs = []
         for job in jobs:
             try:
@@ -256,14 +362,14 @@ class EmailProcessor:
 
     def fetch_jobs_from_email(self, user_id) -> APIResponse:
         try:
-            self.connect_to_mailbox()
+            self.establish_mailbox_connection()
             num_messages = len(self.mailbox.list()[1])  # Fetch the number of messages
             self.logger.info(f"Number of messages in the mailbox: {num_messages}")
 
             # Iterate through the most recent emails, starting from the last one
             for i in range(max(1, num_messages - self.num_messages_to_read + 1), num_messages + 1):
                 self.logger.info(f"Fetching email {i} out of {num_messages}")
-                result = self.fetch_and_process_email(i, user_id, job_application_processor)
+                result = self.retrieve_email_jobs(i, user_id)
                 if result.status == "failure":
                     return result
 

@@ -1,7 +1,7 @@
 import os
 import logging
 from app.db.postgresdb import PostgresDB
-from app.utils.schema_versions_manager import SchemaVersionsManager
+from app.managers.schema_versions_manager import SchemaVersionsManager
 
 class UpdateSchemaManager:
     def __init__(self, db: PostgresDB, migrations_folder: str = "db_migrations"):

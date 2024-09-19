@@ -9,11 +9,9 @@ import re
 import traceback
 import time
 from datetime import datetime
-from app.utils.email_sender import EmailSender
-
+from app.services.email_sender import EmailSender
 class JobApplicationProcessor:
-    def __init__(self, job_details):
-        self.job_details = job_details
+    def __init__(self):
         self.email_sender = EmailSender()
         self.logger = logging.getLogger(__name__)
         self.api_key = os.getenv('GEMINI_API_KEY', '')
@@ -633,7 +631,7 @@ class JobApplicationProcessor:
 #     num_messages = 0
 #     try:
 #         logger.info("Connecting to mailbox to retrieve the number of messages.")
-#         email_processor.connect_to_mailbox()  # Connect once to get the number of messages
+#         email_processor.establish_mailbox_connection()  # Connect once to get the number of messages
         
 #         num_messages = len(email_processor.mailbox.list()[1])  # Fetch the number of messages
 #         logger.info(f"Number of messages in the mailbox: {num_messages}")
@@ -647,7 +645,7 @@ class JobApplicationProcessor:
 #     for i in range(num_messages - email_processor.num_messages_to_read + 1, num_messages + 1):
 #         try:
 #             logger.info(f"Connecting to mailbox to process email {i}.")
-#             email_processor.connect_to_mailbox()  # Reconnect before processing each email
+#             email_processor.establish_mailbox_connection()  # Reconnect before processing each email
             
 #             logger.debug(f"Fetching and processing email {i}.")
 #             email_processor.fetch_and_process_email(i, job_application_processor)

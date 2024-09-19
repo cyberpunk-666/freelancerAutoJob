@@ -1,13 +1,12 @@
 from flask import Blueprint, jsonify
-from app.models.user_manager import UserManager
-from app.models.role_manager import RoleManager
+from app.managers.user_manager import UserManager
+from app.managers.role_manager import RoleManager
 from app.db.postgresdb import PostgresDB
-from app.db.utils import get_db
+from app.db.db_utils import get_db
 from flask_login import login_required, current_user
-from app.utils.api_response import APIResponse
 admin_bp = Blueprint('admin', __name__)
 
-from app.utils.api_response import APIResponse
+from app.models.api_response import APIResponse
 from flask import render_template
 
 @admin_bp.route('/dashboard')

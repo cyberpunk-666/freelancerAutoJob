@@ -1,11 +1,12 @@
 from flask import Blueprint, request
 from flask_login import login_required
-from app.models.user_manager import UserManager
-from app.db.utils import get_db
-from app.models.role_manager import RoleManager
+from app.managers.user_manager import UserManager
+from app.db.db_utils import get_db
+from app.managers.role_manager import RoleManager
 from app.decorators import role_required
 
 role_api_bp = Blueprint('role_api', __name__)
+
 @role_api_bp.route('/', methods=['GET'])
 @login_required
 @role_required('admin')
@@ -26,62 +27,62 @@ def create_role_api():
     new_role_response = role_manager.create_role(role_name)
     return new_role_response.to_dict()
 
-@role_api_bp.route('/<int:role_id>', methods=['GET'])
+@role_api_bp.route('/<string:role_name>', methods=['GET'])
 @login_required
 @role_required('admin')
-def get_role(role_id):
+def get_role(role_name):
     db = get_db()
     role_manager = RoleManager(db)
-    role_response = role_manager.get_role_by_id(role_id)
+    role_response = role_manager.get_role(role_name)
     return role_response.to_dict()
 
-@role_api_bp.route('/<int:role_id>', methods=['PUT'])
+@role_api_bp.route('/<string:role_name>', methods=['PUT'])
 @login_required
 @role_required('admin')
-def update_role_api(role_id):
+def update_role_api(role_name):
     data = request.json
     new_role_name = data.get('name')
     db = get_db()
     role_manager = RoleManager(db)
-    updated_role_response = role_manager.update_role(role_id, new_role_name)
+    updated_role_response = role_manager.update_role(role_name, new_role_name)
     return updated_role_response.to_dict()
 
-@role_api_bp.route('/<int:role_id>', methods=['DELETE'])
+@role_api_bp.route('/<string:role_name>', methods=['DELETE'])
 @login_required
 @role_required('admin')
-def delete_role_api(role_id):
+def delete_role_api(role_name):
     db = get_db()
     role_manager = RoleManager(db)
-    delete_response = role_manager.delete_role(role_id)
+    delete_response = role_manager.delete_role(role_name)
     return delete_response.to_dict()
 
-@role_api_bp.route('/<int:role_id>/users', methods=['GET'])
+@role_api_bp.route('/<string:role_name>/users', methods=['GET'])
 @login_required
 @role_required('admin')
-def get_users_in_role(role_id):
+def get_users_in_role(role_name):
     db = get_db()
     role_manager = RoleManager(db)
-    users_response = role_manager.get_users_in_role(role_id)
+    users_response = role_manager.get_users_in_role(role_name)
     return users_response.to_dict()
 
-@role_api_bp.route('/<int:role_id>/users', methods=['POST'])
+@role_api_bp.route('/<string:role_name>/users', methods=['POST'])
 @login_required
 @role_required('admin')
-def add_user_to_role(role_id):
+def add_user_to_role(role_name):
     data = request.json
     user_id = data.get('userId')
     db = get_db()
     role_manager = RoleManager(db)
-    assign_response = role_manager.assign_role_to_user(user_id, role_id)
+    assign_response = role_manager.assign_role_to_user(user_id, role_name)
     return assign_response.to_dict()
 
-@role_api_bp.route('/<int:role_id>/users/<int:user_id>', methods=['DELETE'])
+@role_api_bp.route('/<string:role_name>/users/<int:user_id>', methods=['DELETE'])
 @login_required
 @role_required('admin')
-def remove_user_from_role(role_id, user_id):
+def remove_user_from_role(role_name, user_id):
     db = get_db()
     role_manager = RoleManager(db)
-    remove_response = role_manager.remove_role_from_user(user_id, role_id)
+    remove_response = role_manager.remove_role_from_user(user_id, role_name)
     return remove_response.to_dict()
 
 @role_api_bp.route('/users/free', methods=['GET'])

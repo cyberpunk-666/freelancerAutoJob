@@ -1,9 +1,10 @@
 from flask import Blueprint, request
 from flask_login import login_required
-from app.models.user_manager import UserManager
-from app.db.utils import get_db
+from app.models.user import User
+from app.managers.user_manager import UserManager
+from app.db.db_utils import get_db
 from app.decorators import role_required
-
+from app.models.api_response import APIResponse
 user_api_bp = Blueprint('user_api', __name__, url_prefix='/api/users')
 
 @user_api_bp.route('/', methods=['GET'])
@@ -12,7 +13,10 @@ user_api_bp = Blueprint('user_api', __name__, url_prefix='/api/users')
 def get_all_users():
     db = get_db()
     user_manager = UserManager(db)
-    users_response = user_manager.get_all_users()
+   # Get filter parameters from request
+    show_inactive = request.args.get('show_inactive', 'false').lower() == 'true'
+     
+    users_response = user_manager.get_all_users(show_inactive)
     return users_response.to_dict()
 
 @user_api_bp.route('/<int:user_id>', methods=['GET'])
@@ -22,6 +26,9 @@ def get_user(user_id):
     db = get_db()
     user_manager = UserManager(db)
     user_response = user_manager.get_user(user_id)
+    # verify if the data type is User
+    if isinstance(user_response.data["user"], User):
+        user_response.data["user"] = user_response.data["user"].toJson()
     return user_response.to_dict()
 
 @user_api_bp.route('/search', methods=['GET'])
@@ -75,8 +82,12 @@ def get_user_roles(user_id):
 @user_api_bp.route('/free', methods=['GET'])
 @login_required
 @role_required('admin')
-def get_free_users():
+def get_free_users_by_role():
     db = get_db()
     user_manager = UserManager(db)
-    free_users_response = user_manager.get_free_users()
+    role_name = request.args.get('role')  # Fetch the role name from the query parameter
+    page = request.args.get('page', 1, type=int)
+    page_size = request.args.get('page_size', 10, type=int)
+
+    free_users_response = user_manager.get_free_users_by_role(role_name=role_name, page=page, page_size=page_size)
     return free_users_response.to_dict()

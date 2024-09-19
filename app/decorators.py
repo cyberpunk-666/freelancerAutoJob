@@ -1,8 +1,8 @@
 from functools import wraps
 from flask import abort
 from flask_login import current_user, login_required
-from app.models.user_manager import UserManager
-from app.db.utils import get_db
+from app.managers.user_manager import UserManager
+from app.db.db_utils import get_db
 
 def role_required(role_name):
     def decorator(f):

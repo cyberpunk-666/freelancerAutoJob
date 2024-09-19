@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
-from app.models.role_manager import RoleManager
+from app.managers.role_manager import RoleManager
 from app.db.postgresdb import PostgresDB
-from app.db.utils import get_db
+from app.db.db_utils import get_db
 from app.decorators import role_required
 
 role_bp = Blueprint('roles', __name__)

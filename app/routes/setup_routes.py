@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from app.models.user_manager import UserManager
-from app.models.role_manager import RoleManager
-from app.db.utils import get_db
+from app.managers.user_manager import UserManager
+from app.managers.role_manager import RoleManager
+from app.db.db_utils import get_db
 from werkzeug.security import generate_password_hash
 import re
 

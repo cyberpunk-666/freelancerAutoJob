@@ -2,15 +2,12 @@ from flask_dance.contrib.google import google
 from flask import flash
 from flask import Blueprint, render_template, redirect, url_for, flash, session, request, session
 from flask_login import login_user, logout_user
-from app.user.forms import RegistrationForm, LoginForm, ResetPasswordForm
-from app.utils.email_sender import EmailSender
+from app.forms.user_forms import UpdateProfileForm, RegistrationForm, LoginForm, ResetPasswordForm
 from flask import url_for
-from app.models.user_manager import UserManager
-from app.db.postgresdb import PostgresDB
-from app.db.utils import get_db
+from app.managers.user_manager import UserManager
+from app.db.db_utils import get_db
 from flask_login import current_user
 from flask_login import login_required, current_user
-from app.user.forms import UpdateProfileForm
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address

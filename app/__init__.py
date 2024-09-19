@@ -1,20 +1,20 @@
 from flask_dance.contrib.google import make_google_blueprint
 from flask_dance.contrib.google import google
 from flask import Flask
-from app.config.config import Config
+from app.models.config import Config
 from app.db.postgresdb import PostgresDB
 from flask import redirect, url_for, current_app
-from app.db.utils import close_db
+from app.db.db_utils import close_db
 import logging
 from flask_login import LoginManager, login_required, current_user
 from dotenv import load_dotenv
 import os
-from app.models.job_manager import JobManager
-from app.models.user_manager import UserManager
-from app.models.processed_email_manager import ProcessedEmailManager
-from app.models.role_manager import RoleManager
-from app.db.utils import get_db
-from app.utils.update_schema_manager import UpdateSchemaManager
+from app.managers.job_manager import JobManager
+from app.managers.user_manager import UserManager
+from app.managers.processed_email_manager import ProcessedEmailManager
+from app.managers.role_manager import RoleManager
+from app.db.db_utils import get_db
+from app.managers.update_schema_manager import UpdateSchemaManager
 SYSTEM_USER_ID = 0
 login_manager = LoginManager()
 login_manager.login_view = 'user.login'
@@ -78,13 +78,13 @@ def create_app():
     login_manager.login_view = 'user.login'
 
     # Register blueprints
-    from app.user.routes import user_bp
-    from app.user.user_api import user_api_bp
-    from app.jobs.routes import job_bp
-    from app.roles.routes import role_bp
-    from app.roles.role_api import role_api_bp
-    from app.setup.routes import setup_bp
-    from app.admin.routes import admin_bp
+    from app.routes.user_routes import user_bp
+    from app.routes.api.user_api_routes import user_api_bp
+    from app.routes.jobs_routes import job_bp
+    from app.routes.role_routes import role_bp
+    from app.routes.api.role_api_routes import role_api_bp
+    from app.routes.setup_routes import setup_bp
+    from app.routes.admin_routes import admin_bp
     
     app.register_blueprint(user_bp, url_prefix='/user')
     app.register_blueprint(job_bp, url_prefix='/jobs')
