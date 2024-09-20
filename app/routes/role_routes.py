@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from app.managers.role_manager import RoleManager
 from app.db.postgresdb import PostgresDB
 from app.db.db_utils import get_db
-from app.decorators import role_required
+from app.utils.decorators import role_required
 
 role_bp = Blueprint('roles', __name__)
 

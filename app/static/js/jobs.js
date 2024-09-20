@@ -1,30 +1,30 @@
-function fetchJobs() {
-    fetch('/jobs/fetch_jobs', { method: 'POST' })
-        .then(response => response.json())
-        .then(jobs => {
-            const tbody = document.querySelector('#jobsTable tbody');
-            tbody.innerHTML = '';
-            jobs.forEach(job => {
-                const row = `<tr>
-                    <td><input type="checkbox" class="job-checkbox" value="${job.id}"></td>
-                    <td>${job.title}</td>
-                    <td>${job.description}</td>
-                    <td><button onclick="processJob(${job.id})">Process</button></td>
-                </tr>`;
-                tbody.innerHTML += row;
-            });
+async function addFetchEmailsTask(userId) {
+    const taskData = {
+        num_messages_to_read: 10
+    };
+
+    try {
+        const response = await fetch('/api/task_queue/add_task', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                type: "fetch_email_jobs",
+                task_data: taskData
+            }),
         });
-}
 
-function processJob(jobId) {
-    fetch(`/jobs/process_job/${jobId}`, { method: 'POST' })
-        .then(response => response.json())
-        .then(result => alert(`Job ${jobId} processed: ${JSON.stringify(result)}`));
-}
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
 
-function queueSelectedJobs() {
-    const selectedJobs = Array.from(document.querySelectorAll('.job-checkbox:checked')).map(cb => cb.value);
-    fetch('/jobs/queue_jobs', { method: 'POST', body: JSON.stringify({ job_ids: selectedJobs }), headers: { 'Content-Type': 'application/json' } })
-        .then(response => response.json())
-        .then(result => alert(result.message));
+        const result = await response.json();
+        console.log('Task added successfully:', result);
+        return result;
+    } catch (error) {
+        console.error('Error adding task:', error);
+        throw error;
+    }
 }

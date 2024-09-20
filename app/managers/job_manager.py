@@ -2,6 +2,35 @@ import logging
 from datetime import datetime
 from app.models.api_response import APIResponse
 from app.db.db_utils import get_db
+from enum import Enum, auto
+
+
+job_status = [{
+    "id": 1,
+    "name": "Fetched",
+    "color": "green"
+},{
+    "id": 2,
+    "name": "In Progress",
+    "color": "yellow"
+},{
+    "id": 3,
+    "name": "Processed",
+    "color": "blue"
+},{
+    "id": 4,
+    "name": "Failed",
+    "color": "red"
+},{
+    "id": 5,
+    "name": "Not a Fit",
+    "color": "black"
+},{
+    "id": 6,
+    "name": "Applied",
+    "color": "purple"
+}]
+
 class JobManager:
     def __init__(self, db):
         self.db = db
@@ -25,7 +54,8 @@ class JobManager:
                 status VARCHAR(50),
                 performance_metrics JSONB,
                 user_id INTEGER NOT NULL, -- User who posted the job
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status_id INTEGER NOT NULL, -- Status of the job
             );
             """
 

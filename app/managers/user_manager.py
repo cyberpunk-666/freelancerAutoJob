@@ -34,7 +34,8 @@ class UserManager(UserMixin):
                     verification_token VARCHAR(255),
                     google_id VARCHAR(255),
                     last_login TIMESTAMP,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    gemini_api_key VARCHAR(255)
                 )
             """)
             self.logger.info("Users table created successfully")
@@ -134,6 +135,23 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Failed to retrieve user with ID {user_id}: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to retrieve user with ID {user_id}: {str(e)}")
+
+    def get_user_profile(self, user_id) -> APIResponse:
+        """Retrieve a user's information by user_id and return a User object."""
+        self.logger.info(f"Retrieving user with ID: {user_id}")
+        try:
+            query = "SELECT user_id, email, gemini_api_key FROM users WHERE user_id = %s"
+            result = self.db.fetch_one(query, (user_id, ))
+            if result:
+                return APIResponse(status="success", message="User retrieved successfully", data={"user": result})
+            else:
+                self.logger.warning(f"User with ID {user_id} not found")
+                return APIResponse(status="failure", message="User not found")
+
+        except Exception as e:
+            self.logger.error(f"Failed to retrieve user with ID {user_id}: {str(e)}", exc_info=True)
+            return APIResponse(status="failure", message=f"Failed to retrieve user with ID {user_id}: {str(e)}")
+ 
         
     def login(self, email, password) -> APIResponse:
         """Authenticate a user based on email, password, active status, and email verification."""

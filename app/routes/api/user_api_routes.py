@@ -3,7 +3,7 @@ from flask_login import login_required
 from app.models.user import User
 from app.managers.user_manager import UserManager
 from app.db.db_utils import get_db
-from app.decorators import role_required
+from app.utils.decorators import role_required
 from app.models.api_response import APIResponse
 user_api_bp = Blueprint('user_api', __name__, url_prefix='/api/users')
 

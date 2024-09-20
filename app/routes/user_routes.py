@@ -68,35 +68,42 @@ def logout():
     flash('You have been logged out.', 'success')
     return redirect(url_for('user.login'))
 
-@user_bp.route('/profile', methods=['GET', 'POST'])
+@user_bp.route('/profile', methods=['GET'])
 @login_required
-def profile():
+def profile_get():
     form = UpdateProfileForm()
-    if form.validate_on_submit():
-        if form.current_password.data:
-            if form.new_password.data:
-                db = get_db()  # Get the database instance
-                user_manager = UserManager(db)                 
-                if user_manager.check_password(current_user.id, form.current_password.data):
-                    user_manager.update_password(current_user.id, form.new_password.data)
-                    flash('Your profile has been updated.', 'success')
-                    return redirect(url_for('user.profile'))                                                 
-                else:
-                    flash('Current password is incorrect.', 'danger')
-                    return render_template('profile.html', form=form)
-            else:
-                flash('Please enter a new password.', 'danger')
-                return render_template('profile.html', form=form)
-        else:
-            flash('Please enter your current password to update your profile.', 'danger')
-            return render_template('profile.html', form=form)
-
-    elif request.method == 'GET':
-        form.email.data = current_user.email
+    user_manager = UserManager(get_db())
+    get_user_response = user_manager.get_user_profile(current_user.user_id)
+    if get_user_response.status == "success":
+        user = get_user_response.data["user"]
+        form.email.data = user[1]
+        form.gemini_api_key.data = user[2]
     else:
-        flash('Please correct the errors in the form.', 'danger')
+        flash(get_user_response.message, 'danger')
     return render_template('profile.html', form=form)
 
+
+@user_bp.route('/profile', methods=['POST'])
+@login_required
+def profile_post():
+    form = UpdateProfileForm()
+    if not form.validate_on_submit():
+        # Print or log form errors for debugging
+        print(form.errors)
+        for field, errors in form.errors.items():
+            for error in errors:
+                print(f"Field: {field}, Error: {error}")
+                
+        flash('Please correct the errors in the form.', 'danger')
+    else:
+        db = get_db()
+        user_manager = UserManager(db)
+        user_manager.update_user(current_user.user_id, data={
+            'email': form.email.data,
+            'gemini_api_key': form.gemini_api_key.data
+        })
+        flash('Profile updated successfully!', 'success')
+    return render_template('profile.html', form=form)
 
 @user_bp.route('/verify-email/<token>', methods=['GET'])
 @login_required

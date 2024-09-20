@@ -68,7 +68,7 @@ def update_schema():
     logger.info("Database schema updated successfully.")
     
 
-def create_app():
+def create_flask_app():
     """Create and configure the Flask application."""
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
@@ -85,6 +85,7 @@ def create_app():
     from app.routes.api.role_api_routes import role_api_bp
     from app.routes.setup_routes import setup_bp
     from app.routes.admin_routes import admin_bp
+    from app.routes.api.task_queue_api_routes import task_queue_bp
     
     app.register_blueprint(user_bp, url_prefix='/user')
     app.register_blueprint(job_bp, url_prefix='/jobs')
@@ -93,6 +94,7 @@ def create_app():
     app.register_blueprint(user_api_bp, url_prefix='/api/users')
     app.register_blueprint(setup_bp)
     app.register_blueprint(admin_bp, url_prefix='/admin')
+    app.register_blueprint(task_queue_bp, url_prefix='/api/task_queue')
     # Teardown database connection
     app.teardown_appcontext(close_db)
 

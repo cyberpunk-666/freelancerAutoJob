@@ -1,5 +1,5 @@
 import threading
-from app import create_app
+from app import create_flask_app
 from flask import Blueprint, render_template, redirect, url_for, flash
 import logging
 from app.models.config import setup_logging
@@ -7,7 +7,7 @@ from flask_talisman import Talisman
 from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 from app.managers.job_manager import JobManager
-from app.services.job_queue import JobQueue
+from app.services.task_queue import TaskQueue
 from app.services.job_application_processor import JobApplicationProcessor
 from app.managers.user_manager import UserManager
 from app.managers.role_manager import RoleManager
@@ -22,10 +22,13 @@ class CustomJSONEncoder(json.JSONEncoder):
         return super().default(obj)
 
 setup_logging()
-app = create_app()
+app = create_flask_app()
 app.json_encoder = CustomJSONEncoder
 Talisman(app, content_security_policy=None)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+task_queue = TaskQueue()
+task_queue.register_callback("fetch_email_jobs", None)
 
 @app.context_processor
 def inject_role_manager():

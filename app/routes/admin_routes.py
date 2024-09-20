@@ -8,20 +8,25 @@ admin_bp = Blueprint('admin', __name__)
 
 from app.models.api_response import APIResponse
 from flask import render_template
-
+from app.utils.decorators import role_required
 @admin_bp.route('/dashboard')
+@role_required('admin')
 def dashboard():
     return render_template('admin_dashboard.html')
 
+
 @admin_bp.route('/users')
+@role_required('admin')
 def users():
     return render_template('admin_users.html')
 
 @admin_bp.route('/roles')
+@role_required('admin')
 def roles():
     return render_template('admin_roles.html')
 
 @admin_bp.route('/data', methods=['GET'])
+@role_required('admin')
 @login_required
 def get_admin_data():
     db = get_db()

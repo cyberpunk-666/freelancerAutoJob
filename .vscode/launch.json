@@ -2,6 +2,15 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Task Queue Listener",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/app/task_queue_listener.py",
+            "console": "integratedTerminal",
+            "args": [],
+            "justMyCode": false
+        },
+        {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",

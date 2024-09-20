@@ -9,7 +9,7 @@ import logging
 from flask import jsonify, request
 from app.services.job_application_processor import JobApplicationProcessor
 from app.services.email_processor import EmailProcessor
-from app.services.job_queue import JobQueue
+from app.services.task_queue import TaskQueue
 from app.models.api_response import APIResponse
 from app.managers.role_manager import RoleManager
 
@@ -118,6 +118,7 @@ def job_detail(job_id):
 
 @job_bp.route('/fetch_jobs', methods=['POST'])
 def fetch_jobs():
+    
     email_processor = EmailProcessor()
     api_response = email_processor.fetch_jobs_from_email(current_user.user_id)
 
@@ -150,7 +151,7 @@ def queue_jobs():
     if not job_ids:
         return jsonify({"error": "No job IDs provided"}), 400
     
-    job_queue = JobQueue()
+    job_queue = TaskQueue()
     for job_id in job_ids:
         job_queue.add_job(job_id, current_user.user_id)
     

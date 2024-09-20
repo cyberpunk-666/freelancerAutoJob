@@ -29,45 +29,26 @@
             {% endif %}
         </div>
 
+        <!-- Reset Password Button -->
+        <div class="form-group text-center">
+            <button type="submit" class="btn btn-warning btn-block">Reset Password</button>
+        </div>
+
+        <!-- Hidden fields for API Key -->
         <div class="form-group">
-            {{ form.current_password.label }}
-            {{ form.current_password(class_="form-control") }}
-            {% if form.current_password.errors %}
+            {{ form.gemini_api_key.label }}
+            {{ form.gemini_api_key(class_="form-control") }}
+            {% if form.gemini_api_key.errors %}
                 <div class="text-danger">
-                    {% for error in form.current_password.errors %}
+                    {% for error in form.gemini_api_key.errors %}
                         <p>{{ error }}</p>
                     {% endfor %}
                 </div>
             {% endif %}
         </div>
-
-        <div class="form-group">
-            {{ form.new_password.label }}
-            {{ form.new_password(class_="form-control") }}
-            {% if form.new_password.errors %}
-                <div class="text-danger">
-                    {% for error in form.new_password.errors %}
-                        <p>{{ error }}</p>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        </div>
-
-        <div class="form-group">
-            {{ form.confirm_password.label }}
-            {{ form.confirm_password(class_="form-control") }}
-            {% if form.confirm_password.errors %}
-                <div class="text-danger">
-                    {% for error in form.confirm_password.errors %}
-                        <p>{{ error }}</p>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        </div>
-
         <div class="form-group text-center">
             {{ form.submit(class_="btn btn-primary btn-block") }}
-        </div>
+        </div>        
     </form>
 </div>
 {% endblock %}

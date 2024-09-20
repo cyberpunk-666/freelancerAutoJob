@@ -426,51 +426,6 @@ class JobApplicationProcessor:
                 return None
         return None
 
-    def process_jobs_from_email(self, jobs, message_id, email_processor, user_id):
-        """Process all jobs from a single email and mark the email as processed if successful."""
-        try:
-            # Process jobs in parallel
-            self.process_jobs(jobs)
-            email_processor.mark_email_as_processed(message_id, user_id)
-        except Exception as e:
-            self.logger.error(
-                f"An error occurred while processing jobs from email {message_id}: {e}")
-            # Do not mark the email as processed
-            
-    def process_jobs(self, jobs):
-        """Process a list of jobs sequentially."""
-        for job in jobs:
-            # Generate the job ID
-            job_id = self.job_details.generate_job_id(job['title'])
-
-            # Prepare data for insertion or update
-            job_data = {
-                'job_id': job_id,
-                'job_title': job['title'],
-                'job_description': job.get('description', ''),
-                'last_occurrence': datetime.now(),
-                'occurrence_count': 1
-            }
-
-            try:
-                # Attempt to insert the job data
-                self.job_details.insert_job(job_data)
-                self.logger.info(f"Inserted job '{job['title']}' into the database.")
-
-            except psycopg2.errors.UniqueViolation:
-                # Handle duplicate key error (job already exists)
-                existing_job = self.job_details.read_job(job_id)
-                updated_data = {
-                    'last_occurrence': datetime.now(),
-                    'occurrence_count': existing_job['occurrence_count'] + 1
-                }
-                self.job_details.update_job(job_id, updated_data)
-                self.logger.info(f"Updated existing job '{job['title']}' with new occurrence timestamp and count.")
-
-            except Exception as e:
-                self.logger.error(f"Failed to process job '{job['title']}': {e}")
-        
-
     def load_profile(self):
         """Load the profile.txt content."""
         profile_path = 'profile.txt'
@@ -570,23 +525,6 @@ class JobApplicationProcessor:
         )
         
 
-    def process_job_from_queue(self, job_queue):
-        while True:
-            job_data = job_queue.get_job()
-            if job_data is None:
-                break
-            
-            job_id, user_id = job_data
-            try:
-                job = self.job_details.read_job(job_id)
-                if job:
-                    self.process_job(job)
-                else:
-                    logging.error(f"Job {job_id} not found for user {user_id}")
-            except Exception as e:
-                logging.error(f"Error processing job {job_id} for user {user_id}: {str(e)}")
-            finally:
-                job_queue.task_done()
 # def main():
 #     # Setup logging with a maximum length for each log entry
 #     logger = setup_logging(max_log_length=500)

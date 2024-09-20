@@ -65,23 +65,11 @@ class ResetPasswordForm(FlaskForm):
     
 class UpdateProfileForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
-    current_password = PasswordField('Current Password', validators=[DataRequired()])
-    new_password = PasswordField('New Password', validators=[EqualTo('confirm_password', message='Passwords must match')])
-    confirm_password = PasswordField('Confirm New Password')
     submit = SubmitField('Update Profile')
+    gemini_api_key = StringField('Gemini API Key')
 
     def validate(self, extra_validators=None, **kwargs):
         # Custom validation logic here
         # For example, you could check if the current password matches the user's actual password
         initial_validation = super(UpdateProfileForm, self).validate(extra_validators=extra_validators, **kwargs)
-        if not initial_validation:
-            return False
-
-        # Add any additional custom validation logic here
-        # For example:
-        if self.new_password.data and not self.current_password.data:
-            self.current_password.errors.append('Please enter your current password to change it.')
-            return False
-        
-        # If everything is okay, return True
-        return True
+        return initial_validation
