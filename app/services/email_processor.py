@@ -27,13 +27,6 @@ import time
 import imaplib
 import smtplib
 
-class APIResponse:
-    def __init__(self, status: str, message: str, data: dict = None):
-        self.status = status
-        self.message = message
-        self.data = data or {}
-
-
 class EmailProcessor:
     def __init__(self):
         self.logger = logging.getLogger()
@@ -159,18 +152,20 @@ class EmailProcessor:
             self.logger.error(f"Error extracting job budget from HTML: {e}")
             return APIResponse(status="failure", message="Error extracting job budget from HTML")   
 
-    def extract_jobs_from_email(self, message, user_id) -> APIResponse:       
+    def extract_jobs_from_email(self, message, user_id) -> APIResponse:
         """
-        Extract job links and details from an email message, process the job if found, and ensure it's stored in the database.
+        Extract job links and details from an email message, process all jobs found, and ensure they're stored in the database.
 
         Args:
             message (email.message.Message): The email message object to process.
             user_id (str): The ID of the user who owns the email.
 
         Returns:
-            APIResponse: A response with the status of job extraction and processing, including job details if successful.
+            APIResponse: A response with the status of job extraction and processing, including details of all jobs found.
         """
         seen_jobs = set()
+        found_jobs = []
+
         if self.target_sender in message['from']:
             payload = message.get_payload()
             if isinstance(payload, list):
@@ -178,74 +173,70 @@ class EmailProcessor:
                     body = part.get_payload(decode=True).decode('utf-8')
                     self.logger.debug("Extracted message body: %s", body)
                     links = self.extract_links_from_body(body)
-                    if links:
-                        for link in links:
+                    if links.status == "success":
+                        for link in links.data["links"]:
                             # Parse the link and remove query parameters
                             parsed_url = urlparse(link)
                             link_without_query = urlunparse(parsed_url._replace(query=""))
 
-                            if link_without_query.startswith(self.job_link_prefix):
-                                if link_without_query not in seen_jobs:
-                                    self.logger.info("Found job link: %s", link_without_query)
-                                    try:
-                                        response = requests.get(link)
-                                        self.logger.debug("Fetched response from job link: %s", response.text[:100])
-                                        soup = BeautifulSoup(response.text, 'html.parser')
+                            if link_without_query.startswith(self.job_link_prefix) and link_without_query not in seen_jobs:
+                                self.logger.info("Found job link: %s", link_without_query)
+                                try:
+                                    response = requests.get(link)
+                                    self.logger.debug("Fetched response from job link: %s", response.text[:100])
+                                    soup = BeautifulSoup(response.text, 'html.parser')
 
-                                        job_description = self.extract_job_description(soup)
-                                        job_title = self.extract_job_title(soup)
-                                        job_budget = self.extract_budget(soup)
+                                    job_description = self.extract_job_description(soup)
+                                    job_title = self.extract_job_title(soup)
+                                    job_budget = self.extract_budget(soup)
 
-                                        if job_description is not None and job_title is not None:
-                                            self.logger.info("Job found: %s", job_title)
+                                    if job_description.status == "success" and job_title.status == "success":
+                                        self.logger.info("Job found: %s", job_title.data["job_title"])
 
-                                            # Check if the job already exists
-                                            if not self.job_manager.job_exists(job_title):
-                                                # Extract the email date
-                                                email_date = parsedate_to_datetime(message['Date'])
+                                        # Check if the job already exists
+                                        if not self.job_manager.job_exists(job_title.data["job_title"]):
+                                            # Extract the email date
+                                            email_date = parsedate_to_datetime(message['Date'])
 
-                                                # Create a new job entry in job_details
-                                                job_id = self.job_manager.create_job(
-                                                    job_title=job_title,
-                                                    job_description=job_description,
-                                                    budget=job_budget,
-                                                    status="open",
-                                                    email_date=email_date
-                                                )
+                                            # Create a new job entry in job_details
+                                            job_id = self.job_manager.create_job(
+                                                job_title=job_title.data["job_title"],
+                                                job_description=job_description.data["job_description"],
+                                                budget=job_budget.data.get("job_budget", "Not specified"),
+                                                status="open",
+                                                email_date=email_date
+                                            )
 
-                                                # Return a successful APIResponse with the new job
-                                                return APIResponse(
-                                                    status="success",
-                                                    message="New job found",
-                                                    data={
-                                                        'job_id': job_id,
-                                                        'title': job_title,
-                                                        'description': job_description,
-                                                        'budget': job_budget,
-                                                        'link': link_without_query,
-                                                        'email_date': email_date
-                                                    }
-                                                )
-                                            else:
-                                                self.logger.debug("Job already exists: %s", job_title)
-                                    except Exception as e:
-                                        self.logger.error(f"Error processing job link {link_without_query}: {e}")
-                                        return APIResponse(
-                                            status="failure",
-                                            message=f"Error processing job link {link_without_query}: {str(e)}"
-                                        )
+                                            found_jobs.append({
+                                                'job_id': job_id,
+                                                'title': job_title.data["job_title"],
+                                                'description': job_description.data["job_description"],
+                                                'budget': job_budget.data.get("job_budget", "Not specified"),
+                                                'link': link_without_query,
+                                                'email_date': email_date
+                                            })
+                                        else:
+                                            self.logger.debug("Job already exists: %s", job_title.data["job_title"])
 
+                                except Exception as e:
+                                    self.logger.error(f"Error processing job link {link_without_query}: {e}")
+                                    # Continue processing other links even if one fails
 
-                            # Add the link to seen jobs
-                            seen_jobs.add(link_without_query)
-                    else:
-                        self.logger.debug("No links found in message body.")
-            else:
-                self.logger.debug("Message not from target sender: %s", message['from'])
+                                # Add the link to seen jobs
+                                seen_jobs.add(link_without_query)
+
+        if found_jobs:
+            return APIResponse(
+                status="success",
+                message=f"Found {len(found_jobs)} new job(s)",
+                data={'jobs': found_jobs}
+            )
         else:
-            self.logger.debug("Message not from target sender: %s", message['from'])
-
-        return APIResponse(status="success", message="No new jobs found")
+            return APIResponse(
+                status="success",
+                message="No new jobs found",
+                data={'jobs': []}
+            )
 
     def retrieve_email_jobs(self, index, user_id, max_retries=3) -> APIResponse:
         """

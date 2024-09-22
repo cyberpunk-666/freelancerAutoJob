@@ -2,6 +2,8 @@
 
 import os
 from dotenv import load_dotenv
+from flask_login import current_user
+from app.services.email_processor import EmailProcessor
 from services.task_queue import TaskQueue
 import logging
 
@@ -13,11 +15,14 @@ load_dotenv()
 
 def handle_email_task(task_data):
     logging.info(f"Processing email task: {task_data}")
+    email_processor = EmailProcessor()
+    email_processor.fetch_jobs_from_email(current_user.user_id)
+    
 
 def run_task_queue_listener():
     # Create a TaskQueue instance
     task_queue = TaskQueue()
-    task_queue.register_callback('fetch_email', handle_email_task)
+    task_queue.register_callback('fetch_email_jobs', handle_email_task)
 
     try:
         # Start processing tasks

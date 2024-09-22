@@ -74,6 +74,6 @@ if __name__ == '__main__':
         # background_thread.start()
 
         # Run the app in debug mode
-        app.run(ssl_context=('cert.pem', 'key_unencrypted.pem'), debug=True, use_reloader=False)
+        app.run(ssl_context=('cert.pem', 'key_unencrypted.pem'), debug=True, use_reloader=False, port=5001)
     else:
         app.run(debug=False)

@@ -1,14 +1,19 @@
 {
     "version": "0.2.0",
-    "configurations": [
+    "configurations": [      
         {
-            "name": "Task Queue Listener",
+            "name": "Server",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/app/task_queue_listener.py",
+            "program": "${workspaceFolder}/app/server.py",
             "console": "integratedTerminal",
+            "env": {
+                "FLASK_APP": "${workspaceFolder}/app/server.py",
+                "FLASK_ENV": "development",
+                "PYTHONPATH": "${workspaceFolder}"
+            },
             "args": [],
-            "justMyCode": false
+            "jinja": true
         },
         {
             "name": "Python Debugger: Current File",

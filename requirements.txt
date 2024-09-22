@@ -27,3 +27,6 @@ flask_dance
 boto3
 pytest
 motos
+websockets
+flask_socketio
+eventlet

@@ -82,10 +82,10 @@ class PostgresDB:
             with self.connection.cursor() as cursor:
                 cursor.execute(query, params)
                 result = cursor.fetchone()
-                self.logger.debug(f"Query executed successfully: {query}")
+                self.logger.debug(f"Query executed successfully")
                 return result
         except Exception as e:
-            self.logger.error(f"Error fetching data: {e}")
+            self.logger.error(f"Error fetching data: {e}\n Query: {query}")
             raise
 
     def fetch_all(self, query, params=None):
