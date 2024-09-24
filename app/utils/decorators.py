@@ -9,8 +9,7 @@ def role_required(role_name):
         @wraps(f)
         @login_required
         def decorated_function(*args, **kwargs):
-            db = get_db()
-            user_manager = UserManager(db)
+            user_manager = UserManager()
             
             # Check if the system is initialized
             init_response = user_manager.system_initialized()

@@ -9,8 +9,7 @@ setup_bp = Blueprint('setup', __name__)
 
 @setup_bp.route('/initial-setup', methods=['GET'])
 def initial_setup_get():
-    db = get_db()
-    user_manager = UserManager(db)
+    user_manager = UserManager()
 
     # Check if the system is already initialized
     init_response = user_manager.system_initialized()
@@ -26,9 +25,8 @@ def initial_setup_get():
 
 @setup_bp.route('/initial-setup', methods=['POST'])
 def initial_setup_post():
-    db = get_db()
-    user_manager = UserManager(db)
-    role_manager = RoleManager(db)
+    user_manager = UserManager()
+    role_manager = RoleManager()
 
     # Check if the system is already initialized
     init_response = user_manager.system_initialized()

@@ -11,11 +11,9 @@ user_api_bp = Blueprint('user_api', __name__, url_prefix='/api/users')
 @login_required
 @role_required('admin')
 def get_all_users():
-    db = get_db()
-    user_manager = UserManager(db)
-   # Get filter parameters from request
+    user_manager = UserManager()
+    # Get filter parameters from request
     show_inactive = request.args.get('show_inactive', 'false').lower() == 'true'
-     
     users_response = user_manager.get_all_users(show_inactive)
     return users_response.to_dict()
 
@@ -23,8 +21,7 @@ def get_all_users():
 @login_required
 @role_required('admin')
 def get_user(user_id):
-    db = get_db()
-    user_manager = UserManager(db)
+    user_manager = UserManager()
     user_response = user_manager.get_user(user_id)
     # verify if the data type is User
     if isinstance(user_response.data["user"], User):
@@ -36,8 +33,7 @@ def get_user(user_id):
 @role_required('admin')
 def search_users():
     query = request.args.get('q', '')
-    db = get_db()
-    user_manager = UserManager(db)
+    user_manager = UserManager()
     search_response = user_manager.search_users(query)
     return search_response.to_dict()
 
@@ -46,8 +42,7 @@ def search_users():
 @role_required('admin')
 def create_user():
     data = request.json
-    db = get_db()
-    user_manager = UserManager(db)
+    user_manager = UserManager()
     create_response = user_manager.create_user(data)
     return create_response.to_dict()
 
@@ -56,8 +51,7 @@ def create_user():
 @role_required('admin')
 def update_user(user_id):
     data = request.json
-    db = get_db()
-    user_manager = UserManager(db)
+    user_manager = UserManager()
     update_response = user_manager.update_user(user_id, data)
     return update_response.to_dict()
 
@@ -65,8 +59,7 @@ def update_user(user_id):
 @login_required
 @role_required('admin')
 def delete_user(user_id):
-    db = get_db()
-    user_manager = UserManager(db)
+    user_manager = UserManager()
     delete_response = user_manager.delete_user(user_id)
     return delete_response.to_dict()
 
@@ -74,8 +67,7 @@ def delete_user(user_id):
 @login_required
 @role_required('admin')
 def get_user_roles(user_id):
-    db = get_db()
-    user_manager = UserManager(db)
+    user_manager = UserManager()
     roles_response = user_manager.get_user_roles(user_id)
     return roles_response.to_dict()
 
@@ -83,8 +75,7 @@ def get_user_roles(user_id):
 @login_required
 @role_required('admin')
 def get_free_users_by_role():
-    db = get_db()
-    user_manager = UserManager(db)
+    user_manager = UserManager()
     role_name = request.args.get('role')  # Fetch the role name from the query parameter
     page = request.args.get('page', 1, type=int)
     page_size = request.args.get('page_size', 10, type=int)

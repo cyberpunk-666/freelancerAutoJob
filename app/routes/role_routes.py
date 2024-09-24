@@ -11,8 +11,7 @@ role_bp = Blueprint('roles', __name__)
 @login_required
 @role_required('admin')
 def roles():
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     roles = role_manager.get_all_roles()
     return render_template('roles.html', roles=roles)
 
@@ -22,8 +21,7 @@ def roles():
 def create_role():
     if request.method == 'POST':
         role_name = request.form['role_name']
-        db = get_db()
-        role_manager = RoleManager(db)
+        role_manager = RoleManager()
         if role_manager.create_role(role_name):
             flash('Role created successfully!', 'success')
         else:
@@ -35,8 +33,7 @@ def create_role():
 @role_bp.route('/view_role/<int:role_id>')
 @login_required
 def view_role(role_id):
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     role = role_manager.get_role_by_id(role_id)
     if role:
         return render_template('view_role.html', role=role)
@@ -46,8 +43,7 @@ def view_role(role_id):
 @role_bp.route('/update_role/<int:role_id>', methods=['GET', 'POST'])
 @login_required
 def update_role(role_id):
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     role = role_manager.get_role_by_id(role_id)
     if role:
         if request.method == 'POST':
@@ -66,8 +62,7 @@ def update_role(role_id):
 @role_bp.route('/delete_role/<int:role_id>', methods=['POST'])
 @login_required
 def delete_role(role_id):
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     if role_manager.delete_role(role_id):
         flash('Role deleted successfully!', 'success')
     else:
@@ -79,23 +74,20 @@ def delete_role(role_id):
 def assign_role(user_id):
     if request.method == 'POST':
         role_name = request.form['role_name']
-        db = get_db()
-        role_manager = RoleManager(db)
+        role_manager = RoleManager()
         if role_manager.assign_role_to_user(user_id, role_name):
             flash('Role assigned successfully!', 'success')
         else:
             flash('Failed to assign role.', 'error')
         return redirect(url_for('roles.roles'))
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     roles = role_manager.get_all_roles()
     return render_template('assign_role.html', user_id=user_id, roles=roles)
 
 @role_bp.route('/remove_role/<int:user_id>/<role_name>', methods=['POST'])
 @login_required
 def remove_role(user_id, role_name):
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     if role_manager.remove_role_from_user(user_id, role_name):
         flash('Role removed successfully!', 'success')
     else:

@@ -32,13 +32,12 @@ task_queue.register_callback("fetch_email_jobs", None)
 
 @app.context_processor
 def inject_role_manager():
-    role_manager = RoleManager(get_db())
+    role_manager = RoleManager()
     return dict(role_manager=role_manager)
 
 @app.route('/')
 def root():
-    db = get_db()
-    user_manager = UserManager(db)
+    user_manager = UserManager()
     
     # Check if the system is initialized
     init_response = user_manager.system_initialized()
@@ -59,21 +58,8 @@ if __name__ == '__main__':
     app.logger.info("Starting app...")
     # Run the app
     if os.getenv('FLASK_ENV') == 'development':
-        # queue_url = os.getenv('AWS_SQS_QUEUE_URL')
-        # Create job queue and processor
-        # job_queue = JobQueue(queue_url)
-        # job_queue.add_job(1,1)
-        # job_manager = JobManager()
-        # job_processor = JobApplicationProcessor()
-
-        # # Start background thread for processing queued jobs
-        # def process_queued_jobs():
-        #     job_processor.process_job_from_queue(job_queue)
-
-        # background_thread = threading.Thread(target=process_queued_jobs, daemon=True)
-        # background_thread.start()
-
         # Run the app in debug mode
-        app.run(ssl_context=('cert.pem', 'key_unencrypted.pem'), debug=True, use_reloader=False, port=5001)
+        port = os.getenv('WEB_API_FLASK_PORT', 5000)
+        app.run(ssl_context=('cert.pem', 'key_unencrypted.pem'), debug=True, use_reloader=False, port=port)
     else:
         app.run(debug=False)

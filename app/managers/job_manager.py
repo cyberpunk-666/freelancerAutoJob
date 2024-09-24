@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from app.db.postgresdb import PostgresDB
 from app.models.api_response import APIResponse
 from app.db.db_utils import get_db
 from enum import Enum, auto
@@ -32,15 +33,13 @@ job_status = [{
 }]
 
 class JobManager:
-    def __init__(self, db):
-        self.db = db
+    def __init__(self):
+        self.db:PostgresDB = get_db()
         self.logger = logging.getLogger(__name__)
 
     def create_table(self) -> APIResponse:
         """Create the jobs and job_applications tables if they don't exist."""
         try:
-            # Initialize the database
-            db = get_db()
 
             # Example table creation SQL
             create_table_query = """
@@ -60,7 +59,7 @@ class JobManager:
             """
 
             # Create the table
-            db.create_table(create_table_query)
+            self.db.create_table(create_table_query)
             create_job_applications_table_query = """
             CREATE TABLE IF NOT EXISTS job_applications (
                 application_id SERIAL PRIMARY KEY,
@@ -166,3 +165,34 @@ class JobManager:
         except Exception as e:
             self.logger.error(f"Failed to retrieve job applications for user {user_id}", exc_info=True)
             return APIResponse(status="failure", message="Failed to retrieve user job applications")
+
+    def get_jobs_for_user(self, user_id) -> APIResponse:
+        """Get all jobs for a user."""
+        try:
+            query = """
+            SELECT job_id, job_title, job_description, budget, email_date, gemini_results, status, performance_metrics, user_id, created_at, status_id
+            FROM job_details
+            WHERE user_id = %s
+            """
+            results = self.db.fetch_all(query, (user_id, ))
+            jobs = [
+                {
+                    "job_id": row[0],
+                    "job_title": row[1],
+                    "job_description": row[2],
+                    "budget": row[3],
+                    "email_date": row[4].isoformat() if row[4] else None,
+                    "gemini_results": row[5],
+                    "status": row[6],
+                    "performance_metrics": row[7],
+                    "user_id": row[8],
+                    "created_at": row[9].isoformat(),
+                    "status_id": row[10]
+                }
+                for row in results
+            ]
+            self.logger.info(f"Retrieved {len(jobs)} jobs for user {user_id}")
+            return APIResponse(status="success", message="User jobs retrieved successfully", data=jobs)
+        except Exception as e:
+            self.logger.error(f"Failed to retrieve jobs for user {user_id}", exc_info=True)
+            return APIResponse(status="failure", message="Failed to retrieve user jobs")

@@ -30,8 +30,7 @@ import smtplib
 class EmailProcessor:
     def __init__(self):
         self.logger = logging.getLogger()
-        db = get_db()
-        self.job_manager = JobManager(db)
+        self.job_manager = JobManager()
 
         # Email configuration
         self.email_address = os.environ.get('EMAIL_USERNAME')
@@ -46,6 +45,8 @@ class EmailProcessor:
 
         # Instantiate the mailbox object
         self.mailbox = None
+        self.send_message_callback = None
+        
 
 
 
@@ -215,6 +216,9 @@ class EmailProcessor:
                                                 'link': link_without_query,
                                                 'email_date': email_date
                                             })
+                                            
+                                            if self.send_message_callback is not None:
+                                                self.send_message_callback(job_id, user_id)
                                         else:
                                             self.logger.debug("Job already exists: %s", job_title.data["job_title"])
 
@@ -262,7 +266,7 @@ class EmailProcessor:
                 message_id = message['message-id']
 
                 # Check if the email has already been processed
-                pem = ProcessedEmailManager(get_db(), user_id)
+                pem = ProcessedEmailManager()
                 if pem.is_email_processed(message_id, user_id):
                     self.logger.debug(f"Skipping already processed email: {message_id}")
                     return APIResponse(status="success", message="Email already processed")
@@ -305,9 +309,9 @@ class EmailProcessor:
         if result.status == "success" and "job_id" in result.data:
             job = result.data
             try:
-                job_application_processor = JobApplicationProcessor(get_db())
+                job_application_processor = JobApplicationProcessor()
                 job_application_processor.process_job(job)
-                pem = ProcessedEmailManager(get_db(), user_id)
+                pem = ProcessedEmailManager()
                 pem.mark_email_as_processed(job["message_id"], user_id)
                 return APIResponse(status="success", message="Job processed successfully")
             except Exception as e:
@@ -347,7 +351,7 @@ class EmailProcessor:
                 data={"failed_jobs": failed_jobs}
             )
         else:
-            pem = ProcessedEmailManager(get_db(), user_id)
+            pem = ProcessedEmailManager()
             pem.mark_email_as_processed(message_id, user_id)
             return APIResponse(status="success", message="All jobs processed successfully")
 

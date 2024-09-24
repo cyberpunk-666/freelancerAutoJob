@@ -24,8 +24,7 @@ login_manager.login_message = 'Please log in to access this page.'
 @login_manager.user_loader
 def load_user(user_id):
     """Load user by ID."""
-    db = get_db()  # Use get_db to get the database connection
-    user_manager = UserManager(db)
+    user_manager = UserManager()
     
     # Retrieve the user using UserManager
     user_response = user_manager.get_user(user_id)
@@ -39,11 +38,10 @@ def load_user(user_id):
 
 def init_database():
     # Create instances of the managers with the system user ID
-    db = get_db()
-    role_manager = RoleManager(db)
-    job_manager = JobManager(db)
-    processed_email_manager = ProcessedEmailManager(db, user_id=SYSTEM_USER_ID)
-    user_manager = UserManager(db)
+    role_manager = RoleManager()
+    job_manager = JobManager()
+    processed_email_manager = ProcessedEmailManager()
+    user_manager = UserManager()
 
     # Call the create_tables method for each manager
     user_manager.create_table()
@@ -61,8 +59,7 @@ def update_schema():
     """
     The function `update_schema()` updates the database schema and logs a success message.
     """
-    db = get_db()
-    schema_updater = UpdateSchemaManager(db)
+    schema_updater = UpdateSchemaManager()
     schema_updater.update_schema()
     logger = logging.getLogger(__name__)
     logger.info("Database schema updated successfully.")
@@ -86,6 +83,7 @@ def create_flask_app():
     from app.routes.setup_routes import setup_bp
     from app.routes.admin_routes import admin_bp
     from app.routes.api.task_queue_api_routes import task_queue_bp
+    from app.routes.api.jobs_api_routes import jobs_api_bp
     
     app.register_blueprint(user_bp, url_prefix='/user')
     app.register_blueprint(job_bp, url_prefix='/jobs')
@@ -95,6 +93,7 @@ def create_flask_app():
     app.register_blueprint(setup_bp)
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(task_queue_bp, url_prefix='/api/task_queue')
+    app.register_blueprint(jobs_api_bp, url_prefix="/api/jobs")
     # Teardown database connection
     app.teardown_appcontext(close_db)
 

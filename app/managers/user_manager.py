@@ -6,6 +6,8 @@ from datetime import datetime
 import logging
 
 from psycopg2 import DatabaseError
+from app.db.db_utils import get_db
+from app.db.postgresdb import PostgresDB
 from app.models.user import User
 from flask_login import UserMixin
 from flask import jsonify
@@ -16,8 +18,8 @@ import bcrypt
 from app.utils.crypto import Crypto
 from app.models.api_response import APIResponse
 class UserManager(UserMixin):
-    def __init__(self, db):
-        self.db = db
+    def __init__(self):
+        self.db:PostgresDB = get_db()
         self.email_sender = EmailSender()
         self.logger = logging.getLogger(__name__)
 

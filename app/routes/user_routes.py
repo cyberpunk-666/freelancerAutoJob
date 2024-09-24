@@ -23,8 +23,7 @@ user_api_bp = Blueprint('user_api', __name__)
 def signup():
     form = RegistrationForm()
     if form.validate_on_submit():
-        db = get_db()
-        user_manager = UserManager(db)
+        user_manager = UserManager()
         if user_manager.sign_up(form.email.data, form.password.data):
             flash('Account created successfully! Please check your email to verify your account.', 'success')
             return redirect(url_for('user.login'))
@@ -37,8 +36,7 @@ def signup():
 def login():
     form = LoginForm()
     if form.validate_on_submit():
-        db = get_db()  # Get the database instance
-        user_manager = UserManager(db)  # Initialize UserManager with the db instance
+        user_manager = UserManager()  # Initialize UserManager with the db instance
         
         # Login attempt
         login_response = user_manager.login(form.email.data, form.password.data)
@@ -72,7 +70,7 @@ def logout():
 @login_required
 def profile_get():
     form = UpdateProfileForm()
-    user_manager = UserManager(get_db())
+    user_manager = UserManager()
     get_user_response = user_manager.get_user_profile(current_user.user_id)
     if get_user_response.status == "success":
         user = get_user_response.data["user"]
@@ -96,8 +94,7 @@ def profile_post():
                 
         flash('Please correct the errors in the form.', 'danger')
     else:
-        db = get_db()
-        user_manager = UserManager(db)
+        user_manager = UserManager()
         user_manager.update_user(current_user.user_id, data={
             'email': form.email.data,
             'gemini_api_key': form.gemini_api_key.data
@@ -108,8 +105,7 @@ def profile_post():
 @user_bp.route('/verify-email/<token>', methods=['GET'])
 @login_required
 def verify_email(token):
-    db = get_db()
-    user_manager = UserManager(db)
+    user_manager = UserManager()
     email = request.args.get('email')
     if user_manager.verify_email(email, token):
         flash('Email verified successfully! You can now log in.', 'success')
@@ -122,8 +118,7 @@ def verify_email(token):
 def reset_password():
     form = ResetPasswordForm()
     if form.validate_on_submit():
-        db = get_db()
-        user_manager = UserManager(db)
+        user_manager = UserManager()
         if user_manager.reset_password(form.email.data, form.new_password.data):
             flash('Password reset successful! Please log in with your new password.', 'success')
             return redirect(url_for('user.login'))
@@ -140,8 +135,7 @@ def google_login():
         user_info = resp.json()
         google_id = user_info['id']
         email = user_info['email']
-        db = get_db()
-        user_manager = UserManager(db)
+        user_manager = UserManager()
         user = user_manager.get_or_create_user_by_google_id(google_id, email)
         if user:
             login_user(user)

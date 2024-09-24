@@ -4,7 +4,9 @@
 
 {% block content %}
 <h1>Job Listings</h1>
-<table>
+<div id="connection-status" class="alert" style="display: none;"></div>
+<div id="error-message" class="alert alert-danger" style="display: none;"></div>
+<table id="jobsTable">
     <thead>
         <tr>
             <th>Title</th>
@@ -23,28 +25,15 @@
             </td>
             <td>{{ job[3] }}</td>
             <td>{{ job[4] }}</td>
-            <td>{{ job[6] }}</td>
+            <td class="job-status" data-status="{{ job[6] }}">{{ job[6] }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
-<button class="btn btn-primary" id="fetch-jobs-btn" onclick="addFetchEmailsTask()">Fetch Jobs</button>
+<button class="btn btn-primary" id="fetch-jobs-btn">Fetch Jobs</button>
+<button class="btn btn-danger" id="cancel-fetch-btn" style="display: none;">Cancel Fetching</button>
 <button class="btn btn-primary" id="process-jobs-btn" onclick="processSelectedJobs()">Process Selected Jobs</button>
 <button class="btn btn-primary" id="queue-selected-jobs-btn" onclick="queueSelectedJobs()">Queue Selected Jobs</button>
-
-<table id="jobsTable">
-    <thead>
-        <tr>
-            <th>Select</th>
-            <th>Job Title</th>
-            <th>Description</th>
-            <th>Action</th>
-        </tr>
-    </thead>
-    <tbody>
-        <!-- Job rows will be dynamically added here -->
-    </tbody>
-</table>
 
 <script src="{{ url_for('static', filename='js/jobs.js') }}"></script>
 

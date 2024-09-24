@@ -165,24 +165,58 @@ class TaskQueue:
             response = self.sqs_client.receive_message(
                 QueueUrl=self.queue_url,
                 MaxNumberOfMessages=10,
-                WaitTimeSeconds=10,
-                MessageAttributeNames=['All'],
-                MessageAttributeValues={
-                    'DataType': 'String',
-                    'StringValue': user_id
-                }
+                WaitTimeSeconds=10
             )
 
             tasks = []
             if 'Messages' in response:
                 for message in response['Messages']:
-                    message_body = json.loads(message['Body'])
-                    tasks.append(message_body)
+                    try:
+                        message_body = json.loads(message['Body'])
+                        if message_body.get('user_id') == user_id:
+                            tasks.append({
+                                'task': message_body,
+                                'receipt_handle': message['ReceiptHandle']
+                            })
+                    except json.JSONDecodeError:
+                        logging.warning(f"Failed to parse message body as JSON for message {message['MessageId']}")
+                        continue
 
-            return APIResponse(status="success", message="Tasks retrieved successfully", data=tasks)
+            if tasks:
+                return APIResponse(status="success", message="Tasks retrieved successfully", data=tasks)
+            else:
+                return APIResponse(status="success", message="No tasks found for the user", data=[])
         except ClientError as e:
             logging.error(f"Failed to receive messages for user {user_id}: {str(e)}")
             return APIResponse(status="failure", message="Failed to retrieve tasks")
+
+    def has_task_for_user(self, user_id) -> APIResponse:
+        """Check if there are any tasks for the given user in the queue."""
+        try:
+            response = self.sqs_client.receive_message(
+                QueueUrl=self.queue_url,
+                MaxNumberOfMessages=10,
+                WaitTimeSeconds=0
+            )
+
+            if 'Messages' in response:
+                for message in response['Messages']:
+                    try:
+                        message_body = json.loads(message['Body'])
+                        if message_body.get('user_id') == user_id:
+                            logging.info(f"Task found for user {user_id}. Message ID: {message['MessageId']}")
+                            return APIResponse(status="success", message="Task exists for user", data={"message_id": message['MessageId']})
+                    except json.JSONDecodeError:
+                        logging.warning(f"Failed to parse message body as JSON for message {message['MessageId']}")
+                        continue
+
+            logging.info(f"No tasks found for user {user_id}.")
+            return APIResponse(status="success", message="No tasks found for user")
+
+        except ClientError as e:
+            logging.error(f"Error checking for tasks for user {user_id}: {str(e)}")
+            return APIResponse(status="failure", message="Error checking for tasks")
+
 
     def _processing_loop(self):
         futures = []
@@ -191,7 +225,7 @@ class TaskQueue:
                 response = self.sqs_client.receive_message(
                     QueueUrl=self.queue_url,
                     MaxNumberOfMessages=10,
-                    WaitTimeSeconds=20
+                    WaitTimeSeconds=10
                 )
 
                 messages = response.get('Messages', [])

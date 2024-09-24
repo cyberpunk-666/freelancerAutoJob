@@ -5,14 +5,15 @@ from flask import render_template
 from flask import render_template
 
 from app.services.task_queue import TaskQueue
-from flask_login import current_user
+from flask_login import current_user, login_required
 from flask import request
 
 
 task_queue_bp = Blueprint('task_queue', __name__)
 
-@role_required('admin')
+
 @task_queue_bp.route('/add_task', methods=['POST'])
+@login_required
 def add_task():
     task_queue = TaskQueue()
     user_id = current_user.user_id  # You can also fetch user_id from request.json if needed
@@ -40,7 +41,15 @@ def add_task():
     return response.to_dict(), 200
     
 @task_queue_bp.route('/get_tasks') 
+@login_required
 def get_tasks():
     task_queue = TaskQueue()
-    response = task_queue.get_tasks()
-    return response.to_dict()  
+    response = task_queue.get_tasks(current_user.user_id)
+    return response.to_dict() 
+
+@task_queue_bp.route('/has_task')
+@login_required
+def has_task_for_user():
+    task_queue = TaskQueue()
+    response = task_queue.has_task_for_user(current_user.user_id) 
+    return response.to_dict()

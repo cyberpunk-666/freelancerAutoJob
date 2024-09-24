@@ -1,17 +1,17 @@
 import json
 from datetime import datetime
+from app.db.db_utils import get_db
 from app.db.postgresdb import PostgresDB
 import logging
 from app.models.api_response import APIResponse
 
 class ProcessedEmailManager:
-    def __init__(self, db: PostgresDB, user_id):
+    def __init__(self):
         """
         Initialize the ProcessedEmails class with a PostgresDB instance.
         :param db: An instance of the PostgresDB class for database operations.
         """
-        self.db = db
-        self.user_id = user_id
+        self.db:PostgresDB = get_db()
         self.logger = logging.getLogger(__name__)
 
     def mark_email_as_processed(self, message_id, user_id, email_date=None) -> APIResponse:

@@ -29,9 +29,8 @@ def roles():
 @role_required('admin')
 @login_required
 def get_admin_data():
-    db = get_db()
-    user_manager = UserManager(db)
-    role_manager = RoleManager(db)
+    user_manager = UserManager()
+    role_manager = RoleManager()
 
     try:
         users = [user.email for user in user_manager.get_all_users()]

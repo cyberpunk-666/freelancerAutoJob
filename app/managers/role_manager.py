@@ -1,9 +1,11 @@
 import logging
+from app.db.db_utils import get_db
+from app.db.postgresdb import PostgresDB
 from app.models.api_response import APIResponse
 
 class RoleManager:
-    def __init__(self, db):
-        self.db = db
+    def __init__(self):
+        self.db:PostgresDB = get_db()
         self.logger = logging.getLogger(__name__)
 
     def create_tables(self) -> APIResponse:

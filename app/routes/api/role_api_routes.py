@@ -11,8 +11,7 @@ role_api_bp = Blueprint('role_api', __name__)
 @login_required
 @role_required('admin')
 def get_roles():
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     roles_response = role_manager.get_all_roles()
     return roles_response.to_dict()
 
@@ -22,8 +21,7 @@ def get_roles():
 def create_role_api():
     data = request.json
     role_name = data.get('name')
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     new_role_response = role_manager.create_role(role_name)
     return new_role_response.to_dict()
 
@@ -31,8 +29,7 @@ def create_role_api():
 @login_required
 @role_required('admin')
 def get_role(role_name):
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     role_response = role_manager.get_role(role_name)
     return role_response.to_dict()
 
@@ -42,8 +39,7 @@ def get_role(role_name):
 def update_role_api(role_name):
     data = request.json
     new_role_name = data.get('name')
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     updated_role_response = role_manager.update_role(role_name, new_role_name)
     return updated_role_response.to_dict()
 
@@ -51,8 +47,7 @@ def update_role_api(role_name):
 @login_required
 @role_required('admin')
 def delete_role_api(role_name):
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     delete_response = role_manager.delete_role(role_name)
     return delete_response.to_dict()
 
@@ -60,8 +55,7 @@ def delete_role_api(role_name):
 @login_required
 @role_required('admin')
 def get_users_in_role(role_name):
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     users_response = role_manager.get_users_in_role(role_name)
     return users_response.to_dict()
 
@@ -71,8 +65,7 @@ def get_users_in_role(role_name):
 def add_user_to_role(role_name):
     data = request.json
     user_id = data.get('userId')
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     assign_response = role_manager.assign_role_to_user(user_id, role_name)
     return assign_response.to_dict()
 
@@ -80,8 +73,7 @@ def add_user_to_role(role_name):
 @login_required
 @role_required('admin')
 def remove_user_from_role(role_name, user_id):
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     remove_response = role_manager.remove_role_from_user(user_id, role_name)
     return remove_response.to_dict()
 
@@ -89,7 +81,6 @@ def remove_user_from_role(role_name, user_id):
 @login_required
 @role_required('admin')
 def get_free_users():
-    db = get_db()
-    role_manager = RoleManager(db)
+    role_manager = RoleManager()
     users_response = role_manager.get_users_without_role()
     return users_response.to_dict()
