@@ -28,7 +28,9 @@ Talisman(app, content_security_policy=None)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 task_queue = TaskQueue()
-task_queue.register_callback("fetch_email_jobs", None)
+task_queue.register_callback("fetch_email", None)
+task_queue.register_callback('process_single_email', None)
+task_queue.register_callback('scrape_job_details', None)
 
 @app.context_processor
 def inject_role_manager():

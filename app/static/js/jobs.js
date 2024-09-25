@@ -165,7 +165,7 @@ async function addFetchEmailsTask() {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                type: "fetch_email_jobs",
+                type: "fetch_email",
                 task_data: taskData
             }),
         });

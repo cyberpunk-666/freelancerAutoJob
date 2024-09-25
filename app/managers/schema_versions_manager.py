@@ -1,15 +1,16 @@
 import logging
 from datetime import datetime
+from app.db.db_utils import get_db
 from app.db.postgresdb import PostgresDB
 
 class SchemaVersionsManager:
-    def __init__(self, db: PostgresDB):
+    def __init__(self):
         """
         Initialize the SchemaVersionsManager class with a PostgresDB instance.
         :param db: An instance of the PostgresDB class for database operations.
         """
         self.logger = logging.getLogger(__name__)
-        self.db = db
+        self.db: PostgresDB = get_db()
 
     def create_table(self):
         """Create the schema_versions table if it doesn't exist."""

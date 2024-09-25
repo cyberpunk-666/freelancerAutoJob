@@ -10,23 +10,18 @@ from bs4 import BeautifulSoup
 import requests
 import os
 import json
-import concurrent.futures
-from concurrent.futures import ThreadPoolExecutor
-import threading
-import time
-from email.utils import parsedate_to_datetime
-import ssl
 from urllib.parse import urlparse, urlunparse
 from app.models.api_response import APIResponse
 import logging
 from app.managers.processed_email_manager import ProcessedEmailManager
 from app.db.db_utils import get_db
 from app.managers.job_manager import JobManager
-import ssl
 import time
 import imaplib
 import smtplib
-
+import email
+import json
+from email.message import EmailMessage
 class EmailProcessor:
     def __init__(self):
         self.logger = logging.getLogger()
@@ -153,233 +148,132 @@ class EmailProcessor:
             self.logger.error(f"Error extracting job budget from HTML: {e}")
             return APIResponse(status="failure", message="Error extracting job budget from HTML")   
 
-    def extract_jobs_from_email(self, message, user_id) -> APIResponse:
-        """
-        Extract job links and details from an email message, process all jobs found, and ensure they're stored in the database.
-
-        Args:
-            message (email.message.Message): The email message object to process.
-            user_id (str): The ID of the user who owns the email.
-
-        Returns:
-            APIResponse: A response with the status of job extraction and processing, including details of all jobs found.
-        """
-        seen_jobs = set()
-        found_jobs = []
-
-        if self.target_sender in message['from']:
-            payload = message.get_payload()
-            if isinstance(payload, list):
-                for part in payload:
-                    body = part.get_payload(decode=True).decode('utf-8')
-                    self.logger.debug("Extracted message body: %s", body)
-                    links = self.extract_links_from_body(body)
-                    if links.status == "success":
-                        for link in links.data["links"]:
-                            # Parse the link and remove query parameters
-                            parsed_url = urlparse(link)
-                            link_without_query = urlunparse(parsed_url._replace(query=""))
-
-                            if link_without_query.startswith(self.job_link_prefix) and link_without_query not in seen_jobs:
-                                self.logger.info("Found job link: %s", link_without_query)
-                                try:
-                                    response = requests.get(link)
-                                    self.logger.debug("Fetched response from job link: %s", response.text[:100])
-                                    soup = BeautifulSoup(response.text, 'html.parser')
-
-                                    job_description = self.extract_job_description(soup)
-                                    job_title = self.extract_job_title(soup)
-                                    job_budget = self.extract_budget(soup)
-
-                                    if job_description.status == "success" and job_title.status == "success":
-                                        self.logger.info("Job found: %s", job_title.data["job_title"])
-
-                                        # Check if the job already exists
-                                        if not self.job_manager.job_exists(job_title.data["job_title"]):
-                                            # Extract the email date
-                                            email_date = parsedate_to_datetime(message['Date'])
-
-                                            # Create a new job entry in job_details
-                                            job_id = self.job_manager.create_job(
-                                                job_title=job_title.data["job_title"],
-                                                job_description=job_description.data["job_description"],
-                                                budget=job_budget.data.get("job_budget", "Not specified"),
-                                                status="open",
-                                                email_date=email_date
-                                            )
-
-                                            found_jobs.append({
-                                                'job_id': job_id,
-                                                'title': job_title.data["job_title"],
-                                                'description': job_description.data["job_description"],
-                                                'budget': job_budget.data.get("job_budget", "Not specified"),
-                                                'link': link_without_query,
-                                                'email_date': email_date
-                                            })
-                                            
-                                            if self.send_message_callback is not None:
-                                                self.send_message_callback(job_id, user_id)
-                                        else:
-                                            self.logger.debug("Job already exists: %s", job_title.data["job_title"])
-
-                                except Exception as e:
-                                    self.logger.error(f"Error processing job link {link_without_query}: {e}")
-                                    # Continue processing other links even if one fails
-
-                                # Add the link to seen jobs
-                                seen_jobs.add(link_without_query)
-
-        if found_jobs:
-            return APIResponse(
-                status="success",
-                message=f"Found {len(found_jobs)} new job(s)",
-                data={'jobs': found_jobs}
-            )
-        else:
-            return APIResponse(
-                status="success",
-                message="No new jobs found",
-                data={'jobs': []}
-            )
-
-    def retrieve_email_jobs(self, index, user_id, max_retries=3) -> APIResponse:
-        """
-        Retrieve the jobs in an email by index from the mailbox, ensuring it's not already processed.
-
-        Args:
-            index (int): The index of the email to fetch.
-            user_id (str): The ID of the user requesting the email.
-            max_retries (int): The maximum number of retry attempts in case of failure (default: 3).
-
-        Returns:
-            APIResponse: A response object indicating the status of the operation and email details, if successful.
-        """
-        self.logger.debug("Fetching email %d", index)
-        retries = 0
-
-        while retries < max_retries:
-            try:
-                retr_result = self.mailbox.retr(index)
-                response, lines, octets = retr_result
-                msg_content = b'\r\n'.join(lines).decode('utf-8')
-                message = parser.Parser().parsestr(msg_content)
-                message_id = message['message-id']
-
-                # Check if the email has already been processed
-                pem = ProcessedEmailManager()
-                if pem.is_email_processed(message_id, user_id):
-                    self.logger.debug(f"Skipping already processed email: {message_id}")
-                    return APIResponse(status="success", message="Email already processed")
-
-                # Process the message and return the APIResponse
-                return self.extract_jobs_from_email(message, user_id)
-
-            except ssl.SSLError as e:
-                retries += 1
-                self.logger.error(f"SSL error occurred while fetching email {index}: {e}")
-                if retries < max_retries:
-                    wait_time = 2 ** retries  # Exponential backoff
-                    self.logger.info(f"Retrying to fetch email {index} in {wait_time} seconds ({retries}/{max_retries})...")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    self.logger.error(f"Failed to fetch email {index} after {max_retries} attempts due to SSL error.")
-                    return APIResponse(status="failure", message=f"Failed to fetch email {index} due to SSL error")
-
-            except Exception as e:
-                self.logger.error(f"An unexpected error occurred while fetching email {index}: {e}")
-                return APIResponse(status="failure", message=f"Failed to fetch email {index}: {str(e)}")
-
-        self.logger.error(f"Failed to fetch email {index} after {max_retries} attempts.")
-        return APIResponse(status="failure", message=f"Failed to fetch email {index} after {max_retries} attempts")
-
-    def fetch_and_process_email(self, index, user_id) -> APIResponse:
-        """
-        Retrieve an email by index, process its content, and handle job extraction if applicable.
-
-        Args:
-            index (int): The index of the email to retrieve and process.
-            user_id (str): The ID of the user.
-
-        Returns:
-            APIResponse: A response indicating the result of email processing and job extraction.
-        """
-        self.logger.debug(f"Fetching and processing email {index}")
-        result = self.retrieve_email_jobs(index, user_id)
-        if result.status == "success" and "job_id" in result.data:
-            job = result.data
-            try:
-                job_application_processor = JobApplicationProcessor()
-                job_application_processor.process_job(job)
-                pem = ProcessedEmailManager()
-                pem.mark_email_as_processed(job["message_id"], user_id)
-                return APIResponse(status="success", message="Job processed successfully")
-            except Exception as e:
-                self.logger.error(f"Failed to process job: {job['title']} from email {job['message_id']}: {e}")
-                return APIResponse(status="failure", message=f"Failed to process job: {job['title']}: {str(e)}")
-        else:
-            self.logger.warning(f"Skipping email {index} due to errors or no jobs found.")
-            return result
-
+    def extract_job_links(self, emails):
+        job_links = []
+        for email in emails:
+            if self.target_sender in email['from']:
+                payload = email.get_payload()
+                if isinstance(payload, list):
+                    for part in payload:
+                        body = part.get_payload(decode=True).decode('utf-8')
+                        links_response = self.extract_links_from_body(body)
+                        if links_response.status == "success":
+                            for link in links_response.data["links"]:
+                                parsed_url = urlparse(link)
+                                link_without_query = urlunparse(parsed_url._replace(query=""))
+                                if link_without_query.startswith(self.job_link_prefix):
+                                    job_links.append(link_without_query)
         
-    def handle_extracted_jobs(self, jobs, message_id, job_application_processor, user_id) -> APIResponse:
-        """
-        Process a list of job data extracted from an email and mark the email as processed upon success.
+        return APIResponse(status="success", message=f"Extracted {len(job_links)} job links", data={"job_links": job_links})
 
-        Args:
-            jobs (list): List of job data to process.
-            message_id (str): The ID of the processed email.
-            job_application_processor (JobApplicationProcessor): Processor object to handle job applications.
-            user_id (str): The ID of the user associated with the jobs.
-
-        Returns:
-            APIResponse: A response indicating the result of job processing, including any failed jobs.
-        """
-
-        failed_jobs = []
-        for job in jobs:
-            try:
-                job_application_processor.process_job(job)
-            except Exception as e:
-                self.logger.error(f"Failed to process job: {job['title']} from email {message_id}: {e}")
-                failed_jobs.append(job['title'])
-
-        if failed_jobs:
-            return APIResponse(
-                status="partial_failure",
-                message=f"Some jobs failed to process from email {message_id}",
-                data={"failed_jobs": failed_jobs}
-            )
-        else:
-            pem = ProcessedEmailManager()
-            pem.mark_email_as_processed(message_id, user_id)
-            return APIResponse(status="success", message="All jobs processed successfully")
-
-    def fetch_jobs_from_email(self, user_id) -> APIResponse:
+    def scrape_job_details(self, job_link):
         try:
-            self.establish_mailbox_connection()
-            num_messages = len(self.mailbox.list()[1])  # Fetch the number of messages
-            self.logger.info(f"Number of messages in the mailbox: {num_messages}")
+            response = requests.get(job_link)
+            soup = BeautifulSoup(response.text, 'html.parser')
 
-            # Iterate through the most recent emails, starting from the last one
-            for i in range(max(1, num_messages - self.num_messages_to_read + 1), num_messages + 1):
-                self.logger.info(f"Fetching email {i} out of {num_messages}")
-                result = self.retrieve_email_jobs(i, user_id)
-                if result.status == "failure":
-                    return result
+            job_description = self.extract_job_description(soup)
+            job_title = self.extract_job_title(soup)
+            job_budget = self.extract_budget(soup)
 
-            # Return a successful APIResponse
-            return APIResponse(status="success", message="Jobs fetched successfully")
+            if job_description.status == "success" and job_title.status == "success":
+                job_detail = {
+                    "title": job_title.data.get("job_title"),
+                    "description": job_description.data.get("job_description"),
+                    "budget": job_budget.data.get("job_budget") if job_budget.status == "success" else None,
+                    "link": job_link
+                }
+                return APIResponse(status="success", message="Job details scraped successfully", data={"job_detail": job_detail})
+            else:
+                return APIResponse(status="failure", message="Failed to extract all required details for job link", data={"link": job_link})
 
         except Exception as e:
-            self.logger.error(f"Failed to fetch jobs from email: {e}")
-            return APIResponse(status="failure", message="Failed to fetch jobs from email")
+            self.logger.error(f"Error scraping job details from {job_link}: {str(e)}")
+            return APIResponse(status="failure", message=f"Error scraping job details: {str(e)}", data={"link": job_link})
 
-        finally:
-            if self.mailbox:
-                try:
-                    self.mailbox.quit()
-                    self.logger.info("Disconnected from mailbox")
-                except Exception as e:
-                    self.logger.error(f"Error while disconnecting from mailbox: {e}")
+    def fetch_emails(self, num_messages_to_read=10):
+        specific_email = self.target_sender
+        self.establish_mailbox_connection()
+        if not self.is_connected():
+            return APIResponse(status="failure", message="Failed to connect to email server")
 
+        try:
+            emails = []
+            if self.connection_type == 'imap':
+                emails = self._fetch_imap_emails(specific_email, num_messages_to_read)
+            elif self.connection_type == 'pop3':
+                emails = self._fetch_pop3_emails(specific_email, num_messages_to_read)
+            else:
+                return APIResponse(status="failure", message="Unsupported connection type")
+
+            return APIResponse(status="success", message=f"Fetched {len(emails)} emails", data={"emails": emails})
+
+        except Exception as e:
+            self.logger.error(f"Error fetching emails: {str(e)}")
+            return APIResponse(status="failure", message=f"Error fetching emails: {str(e)}")
+
+    def _fetch_imap_emails(self, specific_email=None, num_messages_to_read=None):
+        self.mailbox.select('INBOX')
+        search_criteria = f'FROM "{specific_email}"' if specific_email else 'ALL'
+        _, message_numbers = self.mailbox.search(None, search_criteria)
+        
+        email_ids = message_numbers[0].split()
+        latest_emails = email_ids[-num_messages_to_read:]
+        
+        emails = []
+        for email_id in latest_emails:
+            _, msg_data = self.mailbox.fetch(email_id, '(RFC822)')
+            email_body = msg_data[0][1]
+            email_message = email.message_from_bytes(email_body)
+            emails.append(email_message)
+        
+        return emails
+
+    def _fetch_pop3_emails(self, specific_email=None, num_messages_to_read=None):
+        emails = []
+        num_messages = len(self.mailbox.list()[1])
+        
+        for i in range(num_messages, max(1, num_messages - num_messages_to_read), -1):
+            raw_email = b"\n".join(self.mailbox.retr(i)[1])
+            email_message = email.message_from_bytes(raw_email)
+            
+            if not specific_email or (specific_email and specific_email.lower() in email_message['From'].lower()):
+                emails.append(email_message)
+            
+            if len(emails) >= num_messages_to_read:
+                break
+        
+        return emails
+
+
+
+    def serialize_email(self, email_obj):
+        if isinstance(email_obj, EmailMessage):
+            # Convert EmailMessage object to a dictionary
+            email_dict = {
+                "subject": email_obj["Subject"],
+                "from": email_obj["From"],
+                "to": email_obj["To"],
+                "body": email_obj.get_content()
+            }
+            # Serialize to JSON
+            return json.dumps(email_dict)
+        else:
+            raise TypeError("Expected an EmailMessage object")
+
+    def deserialize_email(self, serialized_email):
+        try:
+            # Deserialize from JSON
+            email_dict = json.loads(serialized_email)
+            
+            # Create a new EmailMessage object
+            email_obj = EmailMessage()
+            email_obj["Subject"] = email_dict["subject"]
+            email_obj["From"] = email_dict["from"]
+            email_obj["To"] = email_dict["to"]
+            email_obj.set_content(email_dict["body"])
+            
+            return email_obj
+        except json.JSONDecodeError:
+            raise ValueError("Invalid JSON format")
+        except KeyError as e:
+            raise ValueError(f"Missing required field: {str(e)}")

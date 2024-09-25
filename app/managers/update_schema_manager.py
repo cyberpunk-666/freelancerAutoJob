@@ -1,19 +1,20 @@
 import os
 import logging
+from app.db.db_utils import get_db
 from app.db.postgresdb import PostgresDB
 from app.managers.schema_versions_manager import SchemaVersionsManager
 
 class UpdateSchemaManager:
-    def __init__(self, db: PostgresDB, migrations_folder: str = "db_migrations"):
+    def __init__(self, migrations_folder: str = "db_migrations"):
         """
         Initialize the UpdateSchemaManager class with a PostgresDB instance and the folder for migration scripts.
         :param db: An instance of the PostgresDB class for database operations.
         :param migrations_folder: Path to the folder containing migration scripts.
         """
         self.logger = logging.getLogger(__name__)
-        self.db = db
+        self.db = get_db()
         self.migrations_folder = migrations_folder
-        self.schema_versions_manager = SchemaVersionsManager(db)
+        self.schema_versions_manager = SchemaVersionsManager()
         
         # Ensure the schema_versions table exists
         self.schema_versions_manager.create_table()
@@ -95,7 +96,7 @@ if __name__ == "__main__":
     db = PostgresDB(**db_config)
 
     # Initialize and run the schema updater
-    schema_updater = UpdateSchemaManager(db, migrations_folder)
+    schema_updater = UpdateSchemaManager(migrations_folder)
     schema_updater.update_schema()
 
     # Close the database connection
