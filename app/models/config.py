@@ -14,14 +14,14 @@ class MaxLengthFilter(logging.Filter):
         return True
 import logging
 
-class CustomLogger(logging.Logger):
+class exc_infoLogger(logging.Logger):
     def error(self, msg, *args, exc_info=True, **kwargs):
         super().error(msg, *args, exc_info=exc_info, **kwargs)
 
 def setup_logging(max_log_length=1000):
     """Setup logging with a single StreamHandler."""
     # Ensure custom logger class is used
-    logging.setLoggerClass(CustomLogger)
+    logging.setLoggerClass(exc_infoLogger)
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
 
@@ -48,6 +48,11 @@ def setup_logging(max_log_length=1000):
     # Add the max length filter to the logger
     max_length_filter = MaxLengthFilter(max_log_length)
     logger.addFilter(max_length_filter)
+
+    # Set log levels for specific loggers
+    logging.getLogger('botocore').setLevel(logging.INFO)
+    logging.getLogger('boto3').setLevel(logging.INFO)
+    logging.getLogger('urllib3').setLevel(logging.INFO)
 
     return logger
 

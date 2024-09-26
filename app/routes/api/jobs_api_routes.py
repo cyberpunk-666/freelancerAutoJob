@@ -19,3 +19,10 @@ def get_jobs():
     if jobs is None:
         return jsonify({"error": "No jobs found for the user"}), 404
     return jobs.to_dict()
+
+@jobs_api_bp.route('/freelancer_jobs', methods=['GET'])
+@login_required
+def fetch_freelancer_jobs():
+    job_manager = JobManager()
+    api_response = job_manager.fetch_and_store_jobs()
+    return api_response.to_dict()

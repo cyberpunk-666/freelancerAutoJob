@@ -65,16 +65,36 @@ class PostgresDB:
                 if "RETURNING" in query:
                     last_id = cursor.fetchone()[0]
                     self.connection.commit()
-                    self.logger.debug(f"Query executed successfully: {query}")
+                    self.logger.debug(f"Query executed successfully")
                     return last_id
                 self.connection.commit()
-                self.logger.debug(f"Query executed successfully: {query}")
+                self.logger.debug(f"Query executed successfully")
         except Exception as e:
-            self.logger.error(f"Error executing query: {e}")
+            self.logger.error(f"Error executing query: {e}\n Query: {query}")
             self.connection.rollback()
             raise
 
 
+    def fetch_one_with_column_names(self, query, params=None):
+        try:
+            with self.connection.cursor() as cur:
+                cur.execute(query, params)
+                
+                # Get the column names
+                column_names = [desc[0] for desc in cur.description]
+                
+                # Fetch the row
+                row = cur.fetchone()
+                
+                if row:
+                    # Combine column names with values
+                    result = dict(zip(column_names, row))
+                    return result
+                else:
+                    return None
+        except Exception as e:
+            print(f"Error executing query: {e}")
+            return None
 
     def fetch_one(self, query, params=None):
         """Fetch a single result from a query."""
@@ -94,10 +114,10 @@ class PostgresDB:
             with self.connection.cursor() as cursor:
                 cursor.execute(query, params)
                 results = cursor.fetchall()
-                self.logger.debug(f"Query executed successfully: {query}")
+                self.logger.debug(f"Query executed successfully")
                 return results
         except Exception as e:
-            self.logger.error(f"Error fetching data: {e}")
+            self.logger.error(f"Error fetching data: {e}\n Query: {query}")
             raise
 
     def create_table(self, create_table_sql):
@@ -150,6 +170,26 @@ class PostgresDB:
         query = f"DELETE FROM {table} WHERE {where_clause}"
         self.execute_query(query, values)
         self.logger.info(f"Deleted object from {table} where {condition}")
+
+    def get_object(self, table, condition):
+        """
+        Get an object (row) from the specified table.
+        :param table: Name of the table.
+        :param condition: Dictionary where keys are column names to match and values are the values to match.
+        :return: The object (row) matching the condition, or None if not found.
+        """
+        where_clause = ' AND '.join([f"{k} = %s" for k in condition.keys()])
+        values = tuple(condition.values())
+
+        query = f"SELECT * FROM {table} WHERE {where_clause}"
+        result = self.fetch_one_with_column_names(query, values)
+        if result:
+            self.logger.info(f"Found object in {table} where {condition}: {result}")
+            return result
+        else:
+            self.logger.info(f"No object found in {table} where {condition}")
+            return None
+
 
     def close(self):
         """Close the database connection."""

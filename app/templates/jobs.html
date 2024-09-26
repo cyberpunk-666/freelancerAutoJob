@@ -3,12 +3,30 @@
 {% block title %}Job Dashboard{% endblock %}
 
 {% block content %}
-<h1>Job Listings</h1>
-<div id="connection-status" class="alert" style="display: none;"></div>
-<div id="error-message" class="alert alert-danger" style="display: none;"></div>
-<table id="jobsTable">
+<h1 class="my-4 text-white text-center">Job Listings</h1>
+<div id="connection-status" class="alert alert-warning d-none"></div>
+<div id="error-message" class="alert alert-danger d-none"></div>
+
+<!-- Action menu and Fetch Jobs button -->
+<div class="mb-3">
+    <button class="btn btn-primary" id="fetch-jobs-btn">Manually Fetch Jobs</button>
+    <div class="btn-group ml-2" id="action-menu">
+        <button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" disabled>
+            Actions
+        </button>
+        <div class="dropdown-menu">
+            <a class="dropdown-item" href="#" id="process-selected">Process Selected Jobs</a>
+            <a class="dropdown-item" href="#" id="delete-selected">Delete Selected Jobs</a>
+        </div>
+    </div>
+</div>
+
+<table class="table table-dark table-striped">
     <thead>
         <tr>
+            <th>
+                <input type="checkbox" id="select-all" aria-label="Select all jobs">
+            </th>
             <th>Title</th>
             <th>Budget</th>
             <th>Email Date</th>
@@ -19,7 +37,10 @@
         {% for job in jobs %}
         <tr>
             <td>
-                <a href="{{ url_for('jobs.job_detail', job_id=job[0]) }}">
+                <input type="checkbox" class="job-checkbox" data-job-id="{{ job[0] }}" aria-label="Select job">
+            </td>
+            <td>
+                <a href="{{ url_for('jobs.job_detail', job_id=job[0]) }}" class="text-info">
                     {{ job[1] }}
                 </a>
             </td>
@@ -30,10 +51,6 @@
         {% endfor %}
     </tbody>
 </table>
-<button class="btn btn-primary" id="fetch-jobs-btn">Fetch Jobs</button>
-<button class="btn btn-danger" id="cancel-fetch-btn" style="display: none;">Cancel Fetching</button>
-<button class="btn btn-primary" id="process-jobs-btn" onclick="processSelectedJobs()">Process Selected Jobs</button>
-<button class="btn btn-primary" id="queue-selected-jobs-btn" onclick="queueSelectedJobs()">Queue Selected Jobs</button>
 
 <script src="{{ url_for('static', filename='js/jobs.js') }}"></script>
 

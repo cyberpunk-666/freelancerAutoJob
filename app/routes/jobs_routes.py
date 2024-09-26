@@ -87,7 +87,8 @@ def index():
 def job_detail(job_id):
     job_manager = JobManager()
     logging.info(f"Fetching job details for job: {job_id}")
-    job = job_manager.read_job(job_id)
+    api_response = job_manager.get_job_by_id(job_id)
+    job = api_response.data if api_response.status == "success" else None
     if job is None:
         logging.warning(f"Job not found or unauthorized access: {job_id}")
         return f"Job with ID {job_id} not found.", 404

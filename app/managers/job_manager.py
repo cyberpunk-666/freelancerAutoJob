@@ -1,5 +1,10 @@
+import hashlib
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
+import os
+
+from flask_login import current_user
+import requests
 from app.db.postgresdb import PostgresDB
 from app.models.api_response import APIResponse
 from app.db.db_utils import get_db
@@ -8,7 +13,7 @@ from enum import Enum, auto
 
 job_status = [{
     "id": 1,
-    "name": "Fetched",
+    "name": "New",
     "color": "green"
 },{
     "id": 2,
@@ -77,15 +82,33 @@ class JobManager:
             self.logger.error("Failed to create jobs and job_applications tables", exc_info=True)
             return APIResponse(status="failure", message="Failed to create tables")
 
-    def post_job(self, job_data) -> APIResponse:
+    def add_new_job(self, job_data) -> APIResponse:
         """Post a new job."""
         try:
-            self.db.add_object("jobs", job_data)
-            self.logger.info(f"New job posted: {job_data['title']}")
+            self.db.add_object("job_details", job_data)
+            self.logger.info(f"New job posted")
             return APIResponse(status="success", message="Job posted successfully")
         except Exception as e:
-            self.logger.error(f"Failed to post job: {job_data['title']}", exc_info=True)
+            self.logger.error(f"Failed to add new job", exc_info=True)
             return APIResponse(status="failure", message="Failed to post job")
+
+    def update_job(self, job_data):
+        try:
+            self.db.update_object("job_details", job_data, {"job_id": job_data["job_id"]})
+            self.logger.info(f"Job {job_data['job_id']} updated")
+            return APIResponse(status="success", message="Job updated successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to update job {job_data['job_id']}", exc_info=True)
+            return APIResponse(status="failure", message="Failed to update job")
+
+    def get_job_by_id(self, job_id):
+        try:
+            job_detail = self.db.get_object("job_details", {"job_id": job_id})
+            self.logger.info(f"Retrieved job {job_id}")
+            return APIResponse(status="success", message="Job retrieved successfully", data=job_detail)
+        except Exception as e:
+            self.logger.error(f"Failed to retrieve job {job_id}", exc_info=True)
+            return APIResponse(status="failure", message="Failed to retrieve job")
 
     def apply_for_job(self, job_id, user_id) -> APIResponse:
         """Apply for a job."""
@@ -196,3 +219,99 @@ class JobManager:
         except Exception as e:
             self.logger.error(f"Failed to retrieve jobs for user {user_id}", exc_info=True)
             return APIResponse(status="failure", message="Failed to retrieve user jobs")
+        
+
+    def fetch_and_store_jobs(self) -> APIResponse:
+        """Fetch jobs from Freelancer API and store them in the database."""
+        try:
+            # Fetch job categories for the current user
+            job_categories = [6, 9, 13, 22]
+            user_currency = "cad" #current_user.currency  # Assumed to be part of the user profile
+            
+            # Get the limit from environment variables or use a default value
+            limit = os.environ.get('FREELANCER_API_LIMIT', 2)
+
+            # Base URL for Freelancer API
+            freelancer_api_base_url = "https://www.freelancer.com/api/projects/0.1/projects/active"
+            
+            # Construct the jobs[] query parameters dynamically from job_categories
+            job_params = "&".join([f"jobs[]={job}" for job in job_categories])
+
+            # Build full URL, including the limit from environment variables
+            freelancer_api_url = f"{freelancer_api_base_url}?limit={limit}&offset=0&full_description&{job_params}&languages[]=en&sort_field=submitdate&compact=true"
+            
+            # Make request to Freelancer API
+            response = requests.get(freelancer_api_url)
+            freelancer_data = response.json()
+
+            # Check if the response status is success
+            if response.status_code == 200 and freelancer_data.get('status') == 'success':
+                projects = freelancer_data['result']['projects']
+
+                for project in projects:
+                    # Convert budget to user's currency
+                    converted_budget = self.convert_budget(
+                        project['currency']['code'], 
+                        user_currency, 
+                        project['budget']['minimum'], 
+                        project['budget']['maximum']
+                    )
+
+                    # Prepare job data for insertion
+                    job_data = {
+                        'job_id': hashlib.md5(project['title'].encode()).hexdigest(),
+                        'job_title': project['title'],
+                        'job_description': project['description'],
+                        'budget': converted_budget,
+                        'email_date': datetime.fromtimestamp(
+                            project.get('time_updated', project.get('time_submitted')), tz=timezone.utc
+                        ),
+                        'gemini_results': "{}",  # Placeholder for future use
+                        'status': project['status'],
+                        'performance_metrics': "{}",  # Placeholder for future use
+                        'user_id': current_user.user_id,
+                        'status_id': 1  # Default status for new jobs
+                    }
+
+                    # Store job data in the database
+                    self.add_new_job(job_data)
+
+                self.logger.info(f"Successfully fetched and stored {len(projects)} jobs for user {current_user.user_id}.")
+                return APIResponse(status="success", message="Jobs fetched and stored successfully", data={"jobs_fetched": len(projects)})
+            
+            else:
+                error_message = freelancer_data.get('message', 'No error message provided')
+                self.logger.error(f"Failed to fetch data from Freelancer API: {error_message}")
+                return APIResponse(status="failure", message=f"Failed to fetch jobs: {error_message}")
+
+        except Exception as e:
+            self.logger.error(f"Error while fetching and storing jobs: {str(e)}", exc_info=True)
+            return APIResponse(status="failure", message="Error while fetching and storing jobs")
+
+    def convert_budget(self, from_currency, to_currency, min_budget, max_budget) -> str:
+        """Convert budget from one currency to another."""
+        try:
+            from_currency = from_currency.lower()
+            # Base URL structure for the new API
+            base_url = f"https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/{from_currency}.json"
+            
+            response = requests.get(base_url)
+            data = response.json()
+
+            if response.status_code == 200 and to_currency in data[from_currency]:
+                # Fetch the conversion rate for the target currency
+                rate = data[from_currency].get(to_currency)
+                if rate:
+                    # Perform the conversion
+                    converted_min = float(rate) * min_budget
+                    converted_max = float(rate) * max_budget
+                    self.logger.info(f"Converted {min_budget}-{max_budget} {from_currency} to {converted_min:.2f}-{converted_max:.2f} {to_currency}.")
+                    return f"{converted_min:.2f}-{converted_max:.2f} {to_currency}"
+
+            # Log error if rate not found
+            self.logger.error(f"Failed to find conversion rate for {to_currency} in the API response.")
+            return f"{min_budget}-{max_budget} {from_currency}"  # Fallback to original values
+
+        except Exception as e:
+            self.logger.error(f"Currency conversion error: {str(e)}", exc_info=True)
+            return f"{min_budget}-{max_budget} {from_currency}"  # Fallback in case of error

@@ -7,245 +7,15 @@ body {
 
 /* Sidebar */
 #sidebar {
-    background-color: #2d2d2d;
+    background-color: #343a40;
     color: #fff;
-    min-width: 250px;
-    padding: 15px;
-}
-body {
-    display: flex;
-}
-#sidebar {
     min-width: 250px;
     max-width: 250px;
-    background-color: #343a40;
     padding: 15px;
 }
-#sidebar .nav-link {
-    color: #fff;
-    margin-bottom: 10px;
-}
-#content {
-    flex-grow: 1;
-    padding: 20px;
-}
+
 .navbar-brand {
     color: #fff !important;
-}
-
-/* Navbar Links */
-.nav-link {
-    color: #e6e6e6;
-}
-
-.nav-link:hover {
-    background-color: #3a3a3a;
-    color: #fff;
-}
-
-/* Buttons */
-.btn {
-    background-color: #444;
-    border: 1px solid #555;
-    color: #e6e6e6;
-    border-radius: 4px;
-    padding: 10px 15px;
-}
-
-.btn-primary {
-    background-color: #287aff;
-    border-color: #1a61d8;
-    color: white;
-}
-
-.btn-primary:hover {
-    background-color: #0056d2;
-    border-color: #0041a8;
-}
-
-/* Toggle Switch */
-.toggle-switch {
-    position: relative;
-    width: 40px;
-    height: 20px;
-    background-color: #666;
-    border-radius: 20px;
-    transition: background-color 0.3s;
-}
-
-.toggle-switch input[type="checkbox"] {
-    display: none;
-}
-
-.toggle-switch input[type="checkbox"]:checked + .slider {
-    background-color: #287aff;
-}
-
-.slider {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 16px;
-    height: 16px;
-    background-color: white;
-    border-radius: 50%;
-    transition: 0.3s;
-}
-
-input[type="checkbox"]:checked + .slider {
-    transform: translateX(20px);
-}
-
-/* Checkboxes */
-.checkbox {
-    position: relative;
-    margin-bottom: 20px;
-}
-
-.checkbox input[type="checkbox"] {
-    display: none;
-}
-
-.checkbox label {
-    position: relative;
-    padding-left: 30px;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.checkbox label::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 20px;
-    height: 20px;
-    background-color: #444;
-    border-radius: 4px;
-    border: 2px solid #666;
-    transition: background-color 0.3s, border-color 0.3s;
-}
-
-.checkbox input[type="checkbox"]:checked + label::before {
-    background-color: #287aff;
-    border-color: #1a61d8;
-}
-
-.checkbox label::after {
-    content: "";
-    position: absolute;
-    top: 5px;
-    left: 5px;
-    width: 10px;
-    height: 10px;
-    background-color: #fff;
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.checkbox input[type="checkbox"]:checked + label::after {
-    opacity: 1;
-}
-
-/* Radio Buttons */
-.radio input[type="radio"] {
-    display: none;
-}
-
-.radio label {
-    position: relative;
-    padding-left: 30px;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.radio label::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 20px;
-    height: 20px;
-    background-color: #444;
-    border-radius: 50%;
-    border: 2px solid #666;
-    transition: background-color 0.3s, border-color 0.3s;
-}
-
-.radio input[type="radio"]:checked + label::before {
-    background-color: #287aff;
-    border-color: #1a61d8;
-}
-
-.radio label::after {
-    content: "";
-    position: absolute;
-    top: 6px;
-    left: 6px;
-    width: 8px;
-    height: 8px;
-    background-color: #fff;
-    border-radius: 50%;
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.radio input[type="radio"]:checked + label::after {
-    opacity: 1;
-}
-
-/* Progress Bar */
-.progress-bar {
-    background-color: #444;
-    border-radius: 4px;
-    height: 20px;
-    overflow: hidden;
-    margin-bottom: 15px;
-}
-
-.progress-bar-inner {
-    background-color: #287aff;
-    height: 100%;
-    width: 0;
-    border-radius: 4px;
-    transition: width 0.3s;
-}
-
-/* Input Fields */
-input[type="text"], input[type="password"], select {
-    background-color: #2d2d2d;
-    color: #fff;
-    border: 1px solid #555;
-    border-radius: 4px;
-    padding: 10px;
-    width: 100%;
-    box-sizing: border-box;
-    transition: border-color 0.3s;
-}
-
-input[type="text"]:focus, input[type="password"]:focus, select:focus {
-    border-color: #287aff;
-    outline: none;
-}
-
-/* Date Picker */
-.datepicker {
-    background-color: #2d2d2d;
-    border: 1px solid #555;
-    color: #fff;
-    border-radius: 4px;
-    padding: 5px;
-}
-
-.datepicker .day:hover {
-    background-color: #444;
-    border-radius: 50%;
-}
-
-.datepicker .selected-day {
-    background-color: #287aff;
-    color: white;
-    border-radius: 50%;
 }
 
 /* Modal */
@@ -259,24 +29,53 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus {
     border: none;
 }
 
-.modal-header h4 {
-    color: #287aff;
-}
-
-.modal-close {
-    color: #fff;
-}
-
 /* Scrollbars */
 ::-webkit-scrollbar {
     width: 10px;
 }
 
-::-webkit-scrollbar-track {
-    background-color: #444;
-}
-
 ::-webkit-scrollbar-thumb {
     background-color: #287aff;
     border-radius: 5px;
+}
+
+/* Sidebar Styling */
+#sidebar {
+    height: 100vh; /* Full height */
+    padding-top: 20px;
+}
+
+#sidebar a.nav-link:hover {
+    background-color: #495057;
+}
+
+/* Sticky Sidebar */
+.position-sticky {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
+}
+
+/* Main Content */
+main {
+    padding-top: 20px;
+}
+
+/* Toggle button customization (optional) */
+.navbar-toggler-icon {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg viewBox='0 0 30 30' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke='rgba%28255, 255, 255, 0.7%29' stroke-width='2' stroke-linecap='round' stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
+}
+
+html, body {
+    height: 100%;
+}
+
+#sidebar {
+    height: 100vh; /* Full viewport height */
+    position: fixed; /* Fixes the sidebar on the left */
+}
+
+main {
+    margin-left: 250px; /* Adjust this based on sidebar width */
+    padding: 20px;
 }
