@@ -293,7 +293,11 @@ class JobApplicationProcessor:
         response_schema = {
             "type": "object",
             "properties": {
-                "fit": {"type": "boolean"},
+                "fit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                },
                 "reasons": {"type": "string"}
             },
             "required": ["fit", "reasons"]
@@ -311,6 +315,7 @@ class JobApplicationProcessor:
                     f"Failed to decode structured response: {response_text}")
                 return None
         return None
+
 
 
     def send_email(self, job_title, job_description, estimated_time, assumptions, budget_text, application_letter, detailed_steps):
@@ -452,10 +457,15 @@ class JobApplicationProcessor:
             gemini_results = {}
 
             # Analyze if the job fits the freelancer's profile
-            job_fit = self.analyze_job_fit(job['description'], job['profile'])
+            job_fit = self.analyze_job_fit(job['desciption'], job['profile'])
             gemini_results["analyze_job_fit"] = job_fit
-            if not job_fit or not job_fit['fit']:
-                self._store_job_details(job, gemini_results, "not_a_fit")
+            if not job_fit:
+                self._store_job_details(job, gemini_results, "error_analyzing_job_fit")
+                self.logger.error(f"Failed to analyze job fit for job '{job['title']}'")
+                return
+
+            if job_fit['fit'] < 3:
+                self._store_job_details(job, gemini_results, "job_does_not_fit")
                 self.logger.info(f"Skipping job '{job['title']}' because it does not fit the freelancer's profile.")
                 return
 

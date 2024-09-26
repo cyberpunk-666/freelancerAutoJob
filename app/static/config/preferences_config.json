@@ -1,0 +1,45 @@
+{
+    "preferences": [
+        {
+            "key": "theme",
+            "name": "Theme",
+            "type": "select",
+            "options": [
+                "light",
+                "dark",
+                "system"
+            ],
+            "default": "system",
+            "category": "Appearance"
+        },
+        {
+            "key": "font_size",
+            "name": "Font Size",
+            "type": "number",
+            "min": 8,
+            "max": 24,
+            "default": 16,
+            "category": "Appearance"
+        },
+        {
+            "key": "email_notifications",
+            "name": "Email Notifications",
+            "type": "boolean",
+            "default": true,
+            "category": "Notifications"
+        },
+        {
+            "key": "language",
+            "name": "Language",
+            "type": "select",
+            "options": [
+                "en",
+                "fr",
+                "es",
+                "de"
+            ],
+            "default": "en",
+            "category": "General"
+        }
+    ]
+}

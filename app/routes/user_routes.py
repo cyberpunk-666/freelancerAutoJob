@@ -1,3 +1,4 @@
+import json
 from flask_dance.contrib.google import google
 from flask import flash
 from flask import Blueprint, render_template, redirect, url_for, flash, session, request, session
@@ -147,4 +148,41 @@ def google_login():
     else:
         flash('Failed to get user info from Google.', 'danger')
         return redirect(url_for('user.login'))
+    
 
+@user_bp.route('/preferences', methods=['GET', 'POST'])
+@login_required
+def preferences():
+    user_manager = UserManager()
+    if request.method == 'POST':
+        # Handle form submission
+        for pref_key, pref_value in request.form.items():
+            set_preference_response = user_manager.set_preference(current_user.user_id, pref_key, pref_value)
+            if not set_preference_response.status == "success":
+                flash(set_preference_response.message, 'danger')
+                break  # Exit the loop if there's an error
+        else:  # This else belongs to the for loop (it runs if the loop completes without a break)
+            flash('Preferences updated successfully', 'success')
+        
+        # Redirect to GET after POST (Post/Redirect/Get pattern)
+        return redirect(url_for('user.preferences'))
+
+    # Fetch user preferences (for both GET and after POST)
+    get_preferences_response = user_manager.get_preferences(current_user.user_id)
+    user_preferences = get_preferences_response.data["preferences"] if get_preferences_response.status == "success" else {}
+
+    # Load and process the JSON configuration
+    with open(url_for('static', filename='js/jobs.js'), 'r') as config_file:
+        preferences_config = json.load(config_file)
+
+    # Organize preferences by category
+    preferences_by_category = {}
+    for pref in preferences_config['preferences']:
+        category = pref.get('category', 'General')
+        if category not in preferences_by_category:
+            preferences_by_category[category] = []
+        preferences_by_category[category].append(pref)
+
+    return render_template('preferences.html', 
+        preferences_by_category=preferences_by_category, 
+        user_preferences=user_preferences)

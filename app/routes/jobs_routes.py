@@ -109,4 +109,3 @@ def job_detail(job_id):
             gemini_results['generate_application_letter']['fit'] = markdown.markdown(gemini_results['generate_application_letter']['fit'])
 
     return render_template('job_detail.html', job=job)
-            

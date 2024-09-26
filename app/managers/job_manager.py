@@ -55,12 +55,14 @@ class JobManager:
                 budget VARCHAR(50),
                 email_date TIMESTAMP, -- When the job was received via email
                 gemini_results JSONB, -- JSON array/object of all Gemini results
+                job_fit INTEGER CHECK (job_fit >= 1 AND job_fit <= 5), -- Job fit score
                 status VARCHAR(50),
                 performance_metrics JSONB,
                 user_id INTEGER NOT NULL, -- User who posted the job
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                status_id INTEGER NOT NULL, -- Status of the job
+                status_id INTEGER NOT NULL -- Status of the job
             );
+
             """
 
             # Create the table
