@@ -87,13 +87,13 @@ class UserManager(UserMixin):
                 verification_link = url_for('user.verify_email', token=verification_token, _external=True)
 
                 email_html = render_template(
-                    'verification_email.html',
+                    'emails/verification_email.html',
                     user_name=email,
                     verification_link=verification_link
                 )
 
                 email_text = render_template(
-                    'verification_email.txt',
+                    'emails/verification_email.txt',
                     user_name=email,
                     verification_link=verification_link
                 )
@@ -596,30 +596,3 @@ class UserManager(UserMixin):
             error_message = f"Failed to retrieve users {f'not in role {role_name}' if role_name else 'not assigned to any role'}: {str(e)}"
             self.logger.error(error_message, exc_info=True)
             return APIResponse(status="failure", message=error_message)
-
-    def get_preferences(self, user_id: int) -> APIResponse:
-        self.logger.info(f"Retrieving preferences for user with ID {user_id}")
-        try:
-            query = "SELECT pref_key, pref_value FROM user_preferences WHERE user_id = %s"
-            preferences = self.db.fetch_all(query, (user_id,))
-            preferences_dict = {row[0]: row[1] for row in preferences}
-            self.logger.info(f"Preferences retrieved for user with ID {user_id}: {', '.join([f'{key}={value}' for key, value in preferences_dict.items()])}")
-            return APIResponse(status="success", message="Preferences retrieved successfully", data=preferences_dict)
-        except Exception as e:
-            self.logger.error(f"Failed to retrieve preferences for user {user_id}: {str(e)}", exc_info=True)
-            return APIResponse(status="failure", message=f"Failed to retrieve preferences for user {user_id}: {str(e)}")
-
-    def set_preference(self, user_id: int, pref_key: str, pref_value: str) -> APIResponse:
-        self.logger.info(f"Setting preference for user {user_id}: {pref_key} = {pref_value}")
-        try:
-            query = """
-                INSERT INTO user_preferences (user_id, pref_key, pref_value)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (user_id, pref_key) DO UPDATE SET pref_value = EXCLUDED.pref_value
-            """
-            self.db.execute_query(query, (user_id, pref_key, pref_value))
-            self.logger.info(f"Preference set successfully for user {user_id}: {pref_key} = {pref_value}")
-            return APIResponse(status="success", message="Preference set successfully")
-        except Exception as e:
-            self.logger.error(f"Failed to set user preference for user {user_id}: {str(e)}", exc_info=True)
-            return APIResponse(status="failure", message=f"Failed to set user preference: {str(e)}")

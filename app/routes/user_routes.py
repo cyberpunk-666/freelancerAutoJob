@@ -1,6 +1,7 @@
 import json
+import os
 from flask_dance.contrib.google import google
-from flask import flash
+from flask import app, current_app, flash
 from flask import Blueprint, render_template, redirect, url_for, flash, session, request, session
 from flask_login import login_user, logout_user
 from app.forms.user_forms import UpdateProfileForm, RegistrationForm, LoginForm, ResetPasswordForm
@@ -12,6 +13,8 @@ from flask_login import login_required, current_user
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+
+from app.managers.user_preferences_manager import UserPreferencesManager
 
 csrf = CSRFProtect()
 limiter = Limiter(key_func=get_remote_address)
@@ -30,7 +33,7 @@ def signup():
             return redirect(url_for('user.login'))
         else:
             flash('Sign-up failed. Email might already be registered.', 'danger')
-    return render_template('signup.html', form=form)
+    return render_template('user/signup.html', form=form)
 
 
 @user_bp.route('/login', methods=['GET', 'POST'])
@@ -56,7 +59,7 @@ def login():
         else:
             flash(login_response.message, 'danger')
     
-    return render_template('login.html', form=form)
+    return render_template('user/login.html', form=form)
 
 
 
@@ -79,7 +82,7 @@ def profile_get():
         form.gemini_api_key.data = user[2]
     else:
         flash(get_user_response.message, 'danger')
-    return render_template('profile.html', form=form)
+    return render_template('user/profile.html', form=form)
 
 
 @user_bp.route('/profile', methods=['POST'])
@@ -101,7 +104,7 @@ def profile_post():
             'gemini_api_key': form.gemini_api_key.data
         })
         flash('Profile updated successfully!', 'success')
-    return render_template('profile.html', form=form)
+    return render_template('user/profile.html', form=form)
 
 @user_bp.route('/verify-email/<token>', methods=['GET'])
 @login_required
@@ -125,7 +128,7 @@ def reset_password():
             return redirect(url_for('user.login'))
         else:
             flash('Password reset failed. Please try again.', 'danger')
-    return render_template('reset_password.html', form=form)
+    return render_template('user/reset_password.html', form=form)
 
 @user_bp.route('/google-login')
 def google_login():
@@ -153,11 +156,11 @@ def google_login():
 @user_bp.route('/preferences', methods=['GET', 'POST'])
 @login_required
 def preferences():
-    user_manager = UserManager()
+    user_preferences_manager = UserPreferencesManager()
     if request.method == 'POST':
         # Handle form submission
         for pref_key, pref_value in request.form.items():
-            set_preference_response = user_manager.set_preference(current_user.user_id, pref_key, pref_value)
+            set_preference_response = user_preferences_manager.set_preference(current_user.user_id, pref_key, pref_value)
             if not set_preference_response.status == "success":
                 flash(set_preference_response.message, 'danger')
                 break  # Exit the loop if there's an error
@@ -168,13 +171,19 @@ def preferences():
         return redirect(url_for('user.preferences'))
 
     # Fetch user preferences (for both GET and after POST)
-    get_preferences_response = user_manager.get_preferences(current_user.user_id)
-    user_preferences = get_preferences_response.data["preferences"] if get_preferences_response.status == "success" else {}
+    get_preferences_response = user_preferences_manager.get_preferences(current_user.user_id)
+    user_preferences = get_preferences_response.data if get_preferences_response.status == "success" else {}
 
     # Load and process the JSON configuration
-    with open(url_for('static', filename='js/jobs.js'), 'r') as config_file:
-        preferences_config = json.load(config_file)
-
+    try:
+        app = current_app._get_current_object()
+        with app.app_context():
+            config_file_path = os.path.join(current_app.root_path, 'static', 'config', 'preferences.json')
+            with open(config_file_path, 'r') as config_file:
+                preferences_config = json.load(config_file)
+    except Exception as e:
+        flash(f'Error loading preferences configuration: {str(e)}', 'danger')
+        return render_template('user/preferences.html', user_preferences=user_preferences, preferences_by_category={})
     # Organize preferences by category
     preferences_by_category = {}
     for pref in preferences_config['preferences']:
@@ -183,6 +192,6 @@ def preferences():
             preferences_by_category[category] = []
         preferences_by_category[category].append(pref)
 
-    return render_template('preferences.html', 
+    return render_template('user/preferences.html', 
         preferences_by_category=preferences_by_category, 
         user_preferences=user_preferences)

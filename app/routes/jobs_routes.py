@@ -25,7 +25,7 @@ def jobs():
         jobs = job_manager.fetch_all_jobs()
     else:
         return redirect(url_for('user.login', next=request.url))
-    return render_template('jobs.html', jobs=jobs)
+    return render_template('pages/job/jobs.html', jobs=jobs)
 
 @job_bp.route('/create_job', methods=['GET', 'POST'])
 @login_required
@@ -78,7 +78,7 @@ def index():
         job_manager = JobManager()
         logging.info("Fetching all jobs for index page")
         jobs = job_manager.db.fetch_all('SELECT * FROM job_details WHERE user_id = %s ORDER BY email_date DESC', (current_user.user_id,))
-        return render_template('jobs.html', jobs=jobs)
+        return render_template('pages/job/jobs.html', jobs=jobs)
     else:
         return redirect(url_for('user.login', next=request.url))
 
@@ -108,4 +108,4 @@ def job_detail(job_id):
         if 'fit' in gemini_results['generate_application_letter']:
             gemini_results['generate_application_letter']['fit'] = markdown.markdown(gemini_results['generate_application_letter']['fit'])
 
-    return render_template('job_detail.html', job=job)
+    return render_template('job/job_detail.html', job=job)

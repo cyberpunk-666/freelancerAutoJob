@@ -1,6 +1,7 @@
 from flask_dance.contrib.google import make_google_blueprint
 from flask_dance.contrib.google import google
 from flask import Flask
+from app.managers.user_preferences_manager import UserPreferencesManager
 from app.models.config import Config
 from app.db.postgresdb import PostgresDB
 from flask import redirect, url_for, current_app
@@ -42,12 +43,14 @@ def init_database():
     job_manager = JobManager()
     processed_email_manager = ProcessedEmailManager()
     user_manager = UserManager()
+    user_preferences_manager = UserPreferencesManager()
 
     # Call the create_tables method for each manager
     user_manager.create_table()
     job_manager.create_table()
     processed_email_manager.create_table()
     role_manager.create_tables()
+    user_preferences_manager.create_table()
 
 google_bp = make_google_blueprint(
     client_id="my-key-here",

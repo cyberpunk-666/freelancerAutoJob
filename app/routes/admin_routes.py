@@ -12,18 +12,18 @@ from app.utils.decorators import role_required
 @admin_bp.route('/dashboard')
 @role_required('admin')
 def dashboard():
-    return render_template('admin_dashboard.html')
+    return render_template('admin/admin_dashboard.html')
 
 
 @admin_bp.route('/users')
 @role_required('admin')
 def users():
-    return render_template('admin_users.html')
+    return render_template('admin/admin_users.html')
 
 @admin_bp.route('/roles')
 @role_required('admin')
 def roles():
-    return render_template('admin_roles.html')
+    return render_template('admin/admin_roles.html')
 
 @admin_bp.route('/data', methods=['GET'])
 @role_required('admin')

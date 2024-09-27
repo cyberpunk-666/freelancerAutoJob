@@ -46,7 +46,7 @@ def root():
     
     if init_response.status != "success":
         # If there was an error checking initialization status, render an error page
-        return render_template('error.html', message="Failed to check system initialization status. Please try again later.")
+        return render_template('pages/error.html', message="Failed to check system initialization status. Please try again later.")
     
     if not init_response.data["initialized"]:
         # If the system is not initialized, redirect to the initial setup

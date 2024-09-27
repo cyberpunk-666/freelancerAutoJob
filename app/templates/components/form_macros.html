@@ -1,28 +1,28 @@
-{% macro render_form_field(field) %}
+{% macro render_form_field(field, user_value) %}
     <div class="form-group">
         <label for="{{ field.key }}">{{ field.name }}</label>
         
         {% if field.type == 'string' %}
             <input type="text" class="form-control" id="{{ field.key }}" name="{{ field.key }}" 
-                   value="{{ field.value|default(field.default, true) }}">
+                   value="{{ user_value|default(field.default, true) }}">
 
         {% elif field.type == 'number' %}
             <input type="number" class="form-control" id="{{ field.key }}" name="{{ field.key }}" 
-                   value="{{ field.value|default(field.default, true) }}"
+                   value="{{ user_value|default(field.default, true) }}"
                    {% if field.min is defined %}min="{{ field.min }}"{% endif %}
                    {% if field.max is defined %}max="{{ field.max }}"{% endif %}>
 
         {% elif field.type == 'boolean' %}
             <div class="form-check">
                 <input type="checkbox" class="form-check-input" id="{{ field.key }}" name="{{ field.key }}" 
-                       {% if field.value|default(field.default, true) %}checked{% endif %}>
+                       {% if user_value|default(field.default, true) %}checked{% endif %}>
             </div>
 
         {% elif field.type == 'select' %}
             <select class="form-control" id="{{ field.key }}" name="{{ field.key }}">
                 {% for option in field.options %}
                     <option value="{{ option }}" 
-                            {% if field.value|default(field.default, true) == option %}selected{% endif %}>
+                            {% if user_value|default(field.default, true) == option %}selected{% endif %}>
                         {{ option }}
                     </option>
                 {% endfor %}
@@ -30,7 +30,7 @@
 
         {% else %}
             <input type="text" class="form-control" id="{{ field.key }}" name="{{ field.key }}" 
-                   value="{{ field.value|default(field.default, true) }}">
+                   value="{{ user_value|default(field.default, true) }}">
         {% endif %}
 
         {% if field.description %}
