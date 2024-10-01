@@ -23,8 +23,8 @@ class EmailSender:
         if not hasattr(self, '_initialized'):
             self.smtp_server = os.getenv('SMTP_SERVER')
             self.smtp_port = int(os.getenv('SMTP_PORT', 465))  # Cast to int and provide default
-            self.username = os.getenv('SMTP_USERNAME')
-            self.password = os.getenv('SMTP_PASSWORD')
+            self.username = os.getenv('EMAIL_USERNAME')
+            self.password = os.getenv('EMAIL_PASSWORD')
             
             if not self.smtp_server or not self.smtp_port or not self.username or not self.password:
                 logging.error("Missing SMTP configuration in environment variables")

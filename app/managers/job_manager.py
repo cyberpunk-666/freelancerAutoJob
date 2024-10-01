@@ -6,6 +6,8 @@ import os
 from flask_login import current_user
 import requests
 from app.db.postgresdb import PostgresDB
+from app.managers.currency_convertion_manager import CurrencyConversionManager
+from app.managers.user_preferences_manager import UserPreferencesManager
 from app.models.api_response import APIResponse
 from app.db.db_utils import get_db
 from enum import Enum, auto
@@ -60,6 +62,7 @@ class JobManager:
                 performance_metrics JSONB,
                 user_id INTEGER NOT NULL, -- User who posted the job
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 status_id INTEGER NOT NULL -- Status of the job
             );
 
@@ -206,12 +209,12 @@ class JobManager:
                     "job_title": row[1],
                     "job_description": row[2],
                     "budget": row[3],
-                    "email_date": row[4].isoformat() if row[4] else None,
+                    "email_date": row[4],
                     "gemini_results": row[5],
-                    "status": row[6],
+                    "status": "Fetched",
                     "performance_metrics": row[7],
                     "user_id": row[8],
-                    "created_at": row[9].isoformat(),
+                    "created_at": row[9],
                     "status_id": row[10]
                 }
                 for row in results
@@ -226,12 +229,15 @@ class JobManager:
     def fetch_and_store_jobs(self) -> APIResponse:
         """Fetch jobs from Freelancer API and store them in the database."""
         try:
-            # Fetch job categories for the current user
-            job_categories = [6, 9, 13, 22]
-            user_currency = "cad" #current_user.currency  # Assumed to be part of the user profile
+            user_preferences_manager = UserPreferencesManager()
+            user_preferences_answer = user_preferences_manager.get_preferences(current_user.user_id)
+            user_preferences = UserPreferencesManager.get_api_response_value(user_preferences_answer, 'value')
             
-            # Get the limit from environment variables or use a default value
-            limit = os.environ.get('FREELANCER_API_LIMIT', 2)
+            job_categories = user_preferences.get('job_categories', "")
+            # split string into list
+            job_categories = job_categories.split(",")
+            user_currency = user_preferences.get('currency')
+            number_of_jobs_to_fetch = user_preferences.get('number_of_jobs_to_fetch', 10)
 
             # Base URL for Freelancer API
             freelancer_api_base_url = "https://www.freelancer.com/api/projects/0.1/projects/active"
@@ -240,7 +246,7 @@ class JobManager:
             job_params = "&".join([f"jobs[]={job}" for job in job_categories])
 
             # Build full URL, including the limit from environment variables
-            freelancer_api_url = f"{freelancer_api_base_url}?limit={limit}&offset=0&full_description&{job_params}&languages[]=en&sort_field=submitdate&compact=true"
+            freelancer_api_url = f"{freelancer_api_base_url}?limit={number_of_jobs_to_fetch}&offset=0&full_description&{job_params}&languages[]=en&sort_field=submitdate&compact=true"
             
             # Make request to Freelancer API
             response = requests.get(freelancer_api_url)
@@ -249,10 +255,11 @@ class JobManager:
             # Check if the response status is success
             if response.status_code == 200 and freelancer_data.get('status') == 'success':
                 projects = freelancer_data['result']['projects']
-
+                currency_conversion = CurrencyConversionManager()
+                job_list = []
                 for project in projects:
                     # Convert budget to user's currency
-                    converted_budget = self.convert_budget(
+                    converted_budget = currency_conversion.convert_budget(
                         project['currency']['code'], 
                         user_currency, 
                         project['budget']['minimum'], 
@@ -260,8 +267,9 @@ class JobManager:
                     )
 
                     # Prepare job data for insertion
+                    job_id = hashlib.md5(project['title'].encode()).hexdigest()
                     job_data = {
-                        'job_id': hashlib.md5(project['title'].encode()).hexdigest(),
+                        'job_id': job_id,
                         'job_title': project['title'],
                         'job_description': project['description'],
                         'budget': converted_budget,
@@ -274,12 +282,14 @@ class JobManager:
                         'user_id': current_user.user_id,
                         'status_id': 1  # Default status for new jobs
                     }
+                    project["is_new"] = False
+                    if self.get_job_by_id(job_id).data is None:
+                        self.add_new_job(job_data)
+                        job_list.append(job_data)
 
-                    # Store job data in the database
-                    self.add_new_job(job_data)
 
                 self.logger.info(f"Successfully fetched and stored {len(projects)} jobs for user {current_user.user_id}.")
-                return APIResponse(status="success", message="Jobs fetched and stored successfully", data={"jobs_fetched": len(projects)})
+                return APIResponse(status="success", message="Jobs fetched and stored successfully", data=job_list)
             
             else:
                 error_message = freelancer_data.get('message', 'No error message provided')
@@ -289,31 +299,3 @@ class JobManager:
         except Exception as e:
             self.logger.error(f"Error while fetching and storing jobs: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message="Error while fetching and storing jobs")
-
-    def convert_budget(self, from_currency, to_currency, min_budget, max_budget) -> str:
-        """Convert budget from one currency to another."""
-        try:
-            from_currency = from_currency.lower()
-            # Base URL structure for the new API
-            base_url = f"https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/{from_currency}.json"
-            
-            response = requests.get(base_url)
-            data = response.json()
-
-            if response.status_code == 200 and to_currency in data[from_currency]:
-                # Fetch the conversion rate for the target currency
-                rate = data[from_currency].get(to_currency)
-                if rate:
-                    # Perform the conversion
-                    converted_min = float(rate) * min_budget
-                    converted_max = float(rate) * max_budget
-                    self.logger.info(f"Converted {min_budget}-{max_budget} {from_currency} to {converted_min:.2f}-{converted_max:.2f} {to_currency}.")
-                    return f"{converted_min:.2f}-{converted_max:.2f} {to_currency}"
-
-            # Log error if rate not found
-            self.logger.error(f"Failed to find conversion rate for {to_currency} in the API response.")
-            return f"{min_budget}-{max_budget} {from_currency}"  # Fallback to original values
-
-        except Exception as e:
-            self.logger.error(f"Currency conversion error: {str(e)}", exc_info=True)
-            return f"{min_budget}-{max_budget} {from_currency}"  # Fallback in case of error

@@ -1,3 +1,4 @@
+import json
 import psycopg2
 import logging
 import os
@@ -51,6 +52,7 @@ class PostgresDB:
                 user=self.user,
                 password=self.password
             )
+            self.connection.set_session(autocommit=True)
             self.logger.info("Database connection established successfully.")
         except Exception as e:
             self.logger.error(f"Error connecting to the database: {e}")
@@ -109,16 +111,18 @@ class PostgresDB:
             raise
 
     def fetch_all(self, query, params=None):
-        """Fetch all results from a query."""
         try:
-            with self.connection.cursor() as cursor:
-                cursor.execute(query, params)
-                results = cursor.fetchall()
-                self.logger.debug(f"Query executed successfully")
-                return results
+            with self.connection.cursor() as cur:
+                if params:
+                    cur.execute(query, params)
+                else:
+                    cur.execute(query)
+                return cur.fetchall()
         except Exception as e:
-            self.logger.error(f"Error fetching data: {e}\n Query: {query}")
-            raise
+            self.logger.error(f"Error fetching data: {e}\nQuery: {query}")
+            self.connection.rollback()  # Roll back the transaction
+            raise  # Re-raise the exception after rolling back
+
 
     def create_table(self, create_table_sql):
         """Create a table using the provided SQL statement."""
@@ -150,12 +154,24 @@ class PostgresDB:
         :param data: Dictionary where keys are column names to update and values are the new values.
         :param condition: Dictionary where keys are column names to match and values are the values to match.
         """
-        set_clause = ', '.join([f"{k} = %s" for k in data.keys()])
+        set_clause = []
+        values = []
+        
+        for k, v in data.items():
+            if isinstance(v, dict):
+                # Convert dict to JSON string
+                set_clause.append(f"{k} = %s::jsonb")
+                values.append(json.dumps(v))
+            else:
+                set_clause.append(f"{k} = %s")
+                values.append(v)
+        
+        set_clause = ', '.join(set_clause)
         where_clause = ' AND '.join([f"{k} = %s" for k in condition.keys()])
-        values = tuple(data.values()) + tuple(condition.values())
+        values.extend(condition.values())
         
         query = f"UPDATE {table} SET {set_clause} WHERE {where_clause}"
-        self.execute_query(query, values)
+        self.execute_query(query, tuple(values))
         self.logger.info(f"Updated object in {table} where {condition}: {data}")
 
     def delete_object(self, table, condition):

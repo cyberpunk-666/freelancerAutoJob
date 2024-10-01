@@ -7,25 +7,14 @@ from app.db.db_utils import get_db
 import markdown 
 import logging
 from flask import jsonify, request
-from app.services.job_application_processor import JobApplicationProcessor
 from app.services.email_processor import EmailProcessor
 from app.services.task_queue import TaskQueue
 from app.models.api_response import APIResponse
 from app.managers.role_manager import RoleManager
+from datetime import date
 
 job_bp = Blueprint('jobs', __name__)
 
-
-@job_bp.route('/jobs')
-@login_required
-def jobs():
-    if current_user.is_authenticated:
-        logging.info("Fetching all jobs")
-        job_manager = JobManager()
-        jobs = job_manager.fetch_all_jobs()
-    else:
-        return redirect(url_for('user.login', next=request.url))
-    return render_template('pages/job/jobs.html', jobs=jobs)
 
 @job_bp.route('/create_job', methods=['GET', 'POST'])
 @login_required
@@ -73,14 +62,19 @@ def delete_job(job_id):
 
 @job_bp.route('/')
 @login_required
-def index():
-    if current_user.is_authenticated:
-        job_manager = JobManager()
-        logging.info("Fetching all jobs for index page")
-        jobs = job_manager.db.fetch_all('SELECT * FROM job_details WHERE user_id = %s ORDER BY email_date DESC', (current_user.user_id,))
-        return render_template('pages/job/jobs.html', jobs=jobs)
+def jobs():
+    logging.info("Fetching all jobs")
+    job_manager = JobManager()
+    jobs_answer = job_manager.get_jobs_for_user(current_user.user_id)
+    if jobs_answer.status == "success":
+        logging.info("Jobs fetched successfully")
+        jobs = jobs_answer.data
     else:
-        return redirect(url_for('user.login', next=request.url))
+        logging.warning(f"Failed to fetch jobs: {jobs_answer.message}")
+        jobs = []
+
+    return render_template('job/jobs.html', jobs=jobs)
+
 
 @job_bp.route('/job/<job_id>')
 @login_required

@@ -1,14 +1,18 @@
+from datetime import datetime
 import threading
+
+from flask_login import login_required
 from app import create_flask_app
 from flask import Blueprint, render_template, redirect, url_for, flash
 import logging
+from app.managers.currency_convertion_manager import CurrencyConversionManager
+from app.managers.messages_handler import MessageHandler
 from app.models.config import setup_logging
 from flask_talisman import Talisman
 from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 from app.managers.job_manager import JobManager
 from app.services.task_queue import TaskQueue
-from app.services.job_application_processor import JobApplicationProcessor
 from app.managers.user_manager import UserManager
 from app.managers.role_manager import RoleManager
 from app.db.db_utils import get_db
@@ -26,17 +30,31 @@ app = create_flask_app()
 app.json_encoder = CustomJSONEncoder
 Talisman(app, content_security_policy=None)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+# Custom filter for formatting datetime
+def format_datetime(value, format='%Y-%m-%d'):
+    if isinstance(value, datetime):
+        return value.strftime(format)
+    return value  # Handle if value is not a datetime
 
+# Register the filter in Flask
+app.jinja_env.filters['datetime'] = format_datetime
 task_queue = TaskQueue()
-task_queue.register_callback("fetch_email", None)
-task_queue.register_callback('process_single_email', None)
-task_queue.register_callback('scrape_job_details', None)
+task_queue.register_callback("process_job", None)
+
 
 @app.context_processor
 def inject_role_manager():
     role_manager = RoleManager()
     return dict(role_manager=role_manager)
 
+@app.route('/api/get_options/<field_key>', methods=['get'])
+@login_required
+def get_options(field_key):
+    if field_key == "currency":
+        currency_conversion = CurrencyConversionManager()
+        currencies = currency_conversion.get_available_currencies()
+        return currencies;
+    
 @app.route('/')
 def root():
     user_manager = UserManager()
@@ -53,7 +71,7 @@ def root():
         return redirect(url_for('setup.initial_setup_get'))
     else:
         # If the system is initialized, redirect to the jobs index as before
-        return redirect(url_for('jobs.index'))
+        return redirect(url_for('jobs.jobs'))
 
 
 if __name__ == '__main__':

@@ -53,7 +53,7 @@ def login():
                 user = user_response.data["user"]
                 login_user(user)
                 flash(login_response.message, 'success')
-                return redirect(url_for('jobs.index'))
+                return redirect(url_for('jobs.jobs'))
             else:
                 flash(user_response.message, 'danger')
         else:
@@ -144,7 +144,7 @@ def google_login():
         if user:
             login_user(user)
             flash('Logged in successfully via Google.', 'success')
-            return redirect(url_for('jobs.index'))
+            return redirect(url_for('jobs.jobs'))
         else:
             flash('Failed to log in via Google. Please try again.', 'danger')
             return redirect(url_for('user.login'))
@@ -156,7 +156,9 @@ def google_login():
 @user_bp.route('/preferences', methods=['GET', 'POST'])
 @login_required
 def preferences():
-    user_preferences_manager = UserPreferencesManager()
+    config_file_path = os.path.join(current_app.root_path, 'static', 'config', 'preferences.json')
+
+    user_preferences_manager = UserPreferencesManager(config_file_path)
     if request.method == 'POST':
         # Handle form submission
         for pref_key, pref_value in request.form.items():
@@ -173,24 +175,8 @@ def preferences():
     # Fetch user preferences (for both GET and after POST)
     get_preferences_response = user_preferences_manager.get_preferences(current_user.user_id)
     user_preferences = get_preferences_response.data if get_preferences_response.status == "success" else {}
-
-    # Load and process the JSON configuration
-    try:
-        app = current_app._get_current_object()
-        with app.app_context():
-            config_file_path = os.path.join(current_app.root_path, 'static', 'config', 'preferences.json')
-            with open(config_file_path, 'r') as config_file:
-                preferences_config = json.load(config_file)
-    except Exception as e:
-        flash(f'Error loading preferences configuration: {str(e)}', 'danger')
-        return render_template('user/preferences.html', user_preferences=user_preferences, preferences_by_category={})
-    # Organize preferences by category
-    preferences_by_category = {}
-    for pref in preferences_config['preferences']:
-        category = pref.get('category', 'General')
-        if category not in preferences_by_category:
-            preferences_by_category[category] = []
-        preferences_by_category[category].append(pref)
+    
+    preferences_by_category = user_preferences_manager.get_preferences_categories()
 
     return render_template('user/preferences.html', 
         preferences_by_category=preferences_by_category, 

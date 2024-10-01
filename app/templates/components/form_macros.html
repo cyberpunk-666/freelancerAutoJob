@@ -1,25 +1,35 @@
 {% macro render_form_field(field, user_value) %}
-    <div class="form-group">
-        <label for="{{ field.key }}">{{ field.name }}</label>
+    <div class="form-group mb-3">
+        <label for="{{ field.key }}" class="form-label text-light fw-bold">{{ field.name }}</label>
         
         {% if field.type == 'string' %}
-            <input type="text" class="form-control" id="{{ field.key }}" name="{{ field.key }}" 
-                   value="{{ user_value|default(field.default, true) }}">
+            <input type="text" class="form-control bg-dark text-light border-secondary" 
+                id="{{ field.key }}" name="{{ field.key }}" 
+                value="{{ user_value|default(field.default, true) }}"
+                placeholder="Enter {{ field.name|lower }}">
 
         {% elif field.type == 'number' %}
-            <input type="number" class="form-control" id="{{ field.key }}" name="{{ field.key }}" 
-                   value="{{ user_value|default(field.default, true) }}"
-                   {% if field.min is defined %}min="{{ field.min }}"{% endif %}
-                   {% if field.max is defined %}max="{{ field.max }}"{% endif %}>
+            <input type="number" class="form-control bg-dark text-light border-secondary" 
+                id="{{ field.key }}" name="{{ field.key }}" 
+                value="{{ user_value|default(field.default, true) }}"
+                {% if field.min is defined %}min="{{ field.min }}"{% endif %}
+                {% if field.max is defined %}max="{{ field.max }}"{% endif %}
+                placeholder="Enter {{ field.name|lower }}">
 
         {% elif field.type == 'boolean' %}
-            <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="{{ field.key }}" name="{{ field.key }}" 
-                       {% if user_value|default(field.default, true) %}checked{% endif %}>
-            </div>
+        <div class="form-check form-switch">
+            <input type="checkbox" class="form-check-input" 
+                    id="{{ field.key }}" name="{{ field.key }}" 
+                    value="true"
+                    {% if (user_value == "true" ) or field.default %}checked{% endif %}>
+            <label class="form-check-label text-light" for="{{ field.key }}">Enable</label>
+        </div>
+            
 
         {% elif field.type == 'select' %}
-            <select class="form-control" id="{{ field.key }}" name="{{ field.key }}">
+            <select class="form-select text-light border-secondary" 
+                    id="{{ field.key }}" name="{{ field.key }}">
+                <option value="">Choose {{ field.name }}</option>
                 {% for option in field.options %}
                     <option value="{{ option }}" 
                             {% if user_value|default(field.default, true) == option %}selected{% endif %}>
@@ -28,13 +38,23 @@
                 {% endfor %}
             </select>
 
+        {% elif field.type == 'ajax' %}
+            <select class="form-select text-light border-secondary" 
+                    id="{{ field.key }}" name="{{ field.key }}"
+                    data-url="{{ field.url }}"
+                    data-selected="{{ user_value|default(field.default, true) }}">
+                <option value="">Loading...</option>
+            </select>
+
         {% else %}
-            <input type="text" class="form-control" id="{{ field.key }}" name="{{ field.key }}" 
-                   value="{{ user_value|default(field.default, true) }}">
+            <input type="text" class="form-control bg-dark text-light border-secondary" 
+                   id="{{ field.key }}" name="{{ field.key }}" 
+                   value="{{ user_value|default(field.default, true) }}"
+                   placeholder="Enter {{ field.name|lower }}">
         {% endif %}
 
         {% if field.description %}
-            <small class="form-text text-muted">{{ field.description }}</small>
+            <small class="form-text text-muted mt-1">{{ field.description }}</small>
         {% endif %}
     </div>
 {% endmacro %}

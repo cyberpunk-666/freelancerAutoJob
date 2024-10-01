@@ -13,33 +13,78 @@
             "category": "Appearance"
         },
         {
-            "key": "font_size",
-            "name": "Font Size",
-            "type": "number",
-            "min": 8,
-            "max": 24,
-            "default": 16,
-            "category": "Appearance"
+            "key": "gemini_api_key",
+            "name": "Gemini API Key",
+            "type": "string",
+            "default": "",
+            "category": "API"
         },
         {
-            "key": "email_notifications",
-            "name": "Email Notifications",
+            "key": "job_categories",
+            "name": "Job categories to Fetch from Freelancer API",
+            "type": "string",
+            "default": "",
+            "category": "Jobs",
+            "description": "Comma-separated list of integers"
+        },
+        {
+            "key": "number_of_jobs_to_fetch",
+            "name": "Number of jobs to fetch from API",
+            "type": "number",
+            "default": "50",
+            "category": "Jobs"
+        },        
+        {
+            "key": "auto_process_jobs",
+            "name": "Auto process jobs",
             "type": "boolean",
             "default": true,
+            "category": "Jobs"
+        },        {
+            "key": "process_job_even_if_job_does_not_fit",
+            "name": "Process Job Even If Job Does Not Fit",
+            "type": "boolean",
+            "default": false,
+            "category": "Jobs"
+        },
+        {
+            "key": "job_does_not_fit_threshold",
+            "name": "Job Does Not Fit Threshold",
+            "type": "number",
+            "min": 1,
+            "max": 5,
+            "default": 3,
+            "category": "Jobs"
+        },
+        {
+            "key": "generate_application_letter_even_if_budget_not_acceptable",
+            "name": "Generate Application Letter Even If Budget Not Acceptable",
+            "type": "boolean",
+            "default": false,
+            "category": "Jobs"
+        },
+        {
+            "key": "cron_job_timer",
+            "name": "Cron Job Timer",
+            "type": "number",
+            "default": 60,
+            "category": "Jobs",
+            "description": "Interval in minutes"
+        },
+        {
+            "key": "send_email_if_new_jobs_with_fit_threshold",
+            "name": "Send Email If New Jobs with Fit > Threshold Found",
+            "type": "boolean",
+            "default": false,
             "category": "Notifications"
         },
         {
-            "key": "language",
-            "name": "Language",
-            "type": "select",
-            "options": [
-                "en",
-                "fr",
-                "es",
-                "de"
-            ],
-            "default": "en",
-            "category": "General"
+            "key":"currency",
+            "name":"Currency",
+            "type":"ajax",
+            "url":"/api/get_options/currency",
+            "default":"usd",
+            "category":"Currency"
         }
     ]
 }

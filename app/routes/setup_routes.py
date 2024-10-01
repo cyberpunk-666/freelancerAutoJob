@@ -18,7 +18,7 @@ def initial_setup_get():
     
     if init_response.data["initialized"]:
         # If the system is already initialized, redirect to the jobs index
-        return redirect(url_for('jobs.index'))
+        return redirect(url_for('jobs.jobs'))
 
     return render_template('user/setup.html')
 
@@ -35,7 +35,7 @@ def initial_setup_post():
     
     if init_response.data["initialized"]:
         # If the system is already initialized, redirect to the jobs index
-        return redirect(url_for('jobs.index'))
+        return redirect(url_for('jobs.jobs'))
 
     # Form validation
     email = request.form.get('email')

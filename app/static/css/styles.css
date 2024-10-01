@@ -3,6 +3,7 @@ body {
     background-color: #1b1b1b;
     color: #e6e6e6;
     font-family: Arial, sans-serif;
+    padding-top: 4.5rem;
 }
 
 /* Sidebar */
@@ -70,12 +71,68 @@ html, body {
     height: 100%;
 }
 
-#sidebar {
-    height: 100vh; /* Full viewport height */
-    position: fixed; /* Fixes the sidebar on the left */
+
+.form-control:focus, .form-select:focus {
+    border-color: #5c6bc0;
+    box-shadow: 0 0 0 0.2rem rgba(92, 107, 192, 0.25);
 }
 
-main {
-    margin-left: 250px; /* Adjust this based on sidebar width */
-    padding: 20px;
+.form-control::placeholder {
+    color: #6c757d;
+    opacity: 0.5;
+}
+
+.form-select {
+    border-color: #3D444D;
+    border-radius: 8px;
+    background-color: #2A313C;
+    padding: 5px;
+    padding-right: 30px; /* Extra padding on the right for the custom arrow */
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 16px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+/* Hide default arrow in IE11 */
+.form-select::-ms-expand {
+    display: none;
+}
+
+/* Optional: Add a custom focus style */
+.form-select:focus {
+    border-color: #5c6bc0;
+    box-shadow: 0 0 0 0.2rem rgba(92, 107, 192, 0.25);
+    outline: none;
+}
+
+
+.form-check-input:checked {
+    background-color: #5c6bc0;
+    border-color: #5c6bc0;
+}
+
+#connection-status {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 10px;
+    text-align: center;
+    z-index: 1000; /* Ensure it's above other elements */
+    display: none; /* Hidden by default */
+}
+
+.fixed-top-container{
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background-color: #fff; /* Or any color that matches your design */
+    z-index: 1000; /* Ensures it stays on top of other elements */
+    padding: 10px; /* Add some padding for better appearance */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Optional: adds a subtle shadow */
 }

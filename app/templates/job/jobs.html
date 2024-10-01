@@ -1,35 +1,37 @@
-{% extends "layout/layout.html" %}
-
-{% block title %}Job Dashboard{% endblock %}
-
-{% block content %}
-<h1 class="my-4 text-white text-center">Job Listings</h1>
-<div id="connection-status" class="alert alert-warning d-none"></div>
-<div id="error-message" class="alert alert-danger d-none"></div>
-
-<!-- Action menu and Fetch Jobs button -->
-<div class="mb-3">
+{% extends "layout/layout.html" %} {% block title %}Job Dashboard{% endblock %} {% block content %}
+<div class="dropdown">
     <button class="btn btn-primary" id="fetch-jobs-btn">Manually Fetch Jobs</button>
     <div class="btn-group ml-2" id="action-menu">
-        <button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" disabled>
+        <button
+            class="btn btn-secondary dropdown-toggle"
+            type="button"
+            id="dropdownMenuButton"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+        >
             Actions
         </button>
-        <div class="dropdown-menu">
-            <a class="dropdown-item" href="#" id="process-selected">Process Selected Jobs</a>
-            <a class="dropdown-item" href="#" id="delete-selected">Delete Selected Jobs</a>
-        </div>
+        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+            <li>
+                <a class="dropdown-item" href="#" id="process-selected">Process Selected Jobs</a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="#" id="delete-selected">Delete Selected Jobs</a>
+            </li>
+        </ul>
     </div>
 </div>
 
-<table class="table table-dark table-striped">
+<table id="jobsTable" class="table table-dark table-striped">
     <thead>
         <tr>
             <th>
-                <input type="checkbox" id="select-all" aria-label="Select all jobs">
+                <input type="checkbox" id="select-all" aria-label="Select all jobs" />
             </th>
             <th>Title</th>
             <th>Budget</th>
-            <th>Email Date</th>
+            <th>Date</th>
+            <th>Fit</th>
             <th>Status</th>
         </tr>
     </thead>
@@ -37,16 +39,15 @@
         {% for job in jobs %}
         <tr>
             <td>
-                <input type="checkbox" class="job-checkbox" data-job-id="{{ job[0] }}" aria-label="Select job">
+                <input type="checkbox" class="job-checkbox" data-job-id="{{ job['job_id'] }}" aria-label="Select job" />
             </td>
             <td>
-                <a href="{{ url_for('jobs.job_detail', job_id=job[0]) }}" class="text-info">
-                    {{ job[1] }}
-                </a>
+                <a href="{{ url_for('jobs.job_detail', job_id=job['job_id']) }}" class="text-info"> {{ job["job_title"] }} </a>
             </td>
-            <td>{{ job[3] }}</td>
-            <td>{{ job[4] }}</td>
-            <td class="job-status" data-status="{{ job[6] }}">{{ job[6] }}</td>
+            <td>{{ job["budget"] }}</td>
+            <td>{{ job['created_at'] | datetime('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ job["fit"] }}</td>
+            <td class="job-status" data-status="{{ job['status'] }}">{{ job['status'] }}</td>
         </tr>
         {% endfor %}
     </tbody>

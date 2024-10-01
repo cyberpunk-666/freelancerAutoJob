@@ -1,5 +1,7 @@
-from flask import Blueprint, request
-from flask_login import login_required
+import os
+from flask import Blueprint, current_app, request
+from flask_login import current_user, login_required
+from app.managers.user_preferences_manager import UserPreferencesManager
 from app.models.user import User
 from app.managers.user_manager import UserManager
 from app.db.db_utils import get_db
@@ -81,4 +83,28 @@ def get_free_users_by_role():
     page_size = request.args.get('page_size', 10, type=int)
 
     free_users_response = user_manager.get_free_users_by_role(role_name=role_name, page=page, page_size=page_size)
+   
     return free_users_response.to_dict()
+
+
+
+@user_api_bp.route('/preferences', methods=['POST'])
+@login_required
+def preferences() -> APIResponse:
+    config_file_path = os.path.join(current_app.root_path, 'static', 'config', 'preferences.json')
+
+    user_preferences_manager = UserPreferencesManager(config_file_path)
+    if request.method == 'POST':
+        # Get JSON data from the request
+        preferences_data = request.json
+
+        if not preferences_data:
+            return APIResponse(status="error", message="No preference data received").to_dict()
+
+        # Handle form submission
+        for pref_key, pref_value in preferences_data.items():
+            set_preference_response = user_preferences_manager.set_preference(current_user.user_id, pref_key, pref_value)
+            if set_preference_response.status != "success":
+                return set_preference_response.to_dict()
+
+        return APIResponse(status="success", message="Preferences updated successfully").to_dict()

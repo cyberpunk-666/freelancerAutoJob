@@ -1,6 +1,5 @@
 import poplib
 
-from app.services.job_application_processor import JobApplicationProcessor
 poplib._MAXLINE = 1000000
 from email import parser
 import re
