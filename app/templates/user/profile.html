@@ -1,54 +1,34 @@
-{% extends "layout/small_layout.html" %}
+{% extends "layout/layout.html" %} {% block title %}User Profile{% endblock %} {% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4 text-center">User Profile</h2>
 
-{% block title %}User Profile{% endblock %}
+    <!-- Update Profile Form -->
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title mb-4">Update Profile</h5>
+            <form method="POST">
+                {{ form.hidden_tag() }}
 
-{% block content %}
-<h2 class="mb-4">User Profile</h2>
-
-<!-- Display User Information -->
-<div class="form-container">
-    <h5 class="mb-4">User Information</h5>
-    <p><strong>Email:</strong> {{ current_user.email }}</p>
-</div>
-
-<!-- Update Profile Form -->
-<div class="form-container mt-4">
-    <h5 class="mb-4">Update Profile</h5>
-    <form method="POST">
-        {{ form.hidden_tag() }}
-
-        <div class="form-group">
-            {{ form.email.label }}
-            {{ form.email(class_="form-control") }}
-            {% if form.email.errors %}
-                <div class="text-danger">
-                    {% for error in form.email.errors %}
+                <!-- Email Input -->
+                <div class="form-group mb-3">
+                    {{ form.email.label }} {{ form.email(class_="form-control") }} {% if form.email.errors %}
+                    <div class="text-danger">
+                        {% for error in form.email.errors %}
                         <p>{{ error }}</p>
-                    {% endfor %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
-            {% endif %}
-        </div>
 
-        <!-- Reset Password Button -->
-        <div class="form-group text-center">
-            <button type="submit" class="btn btn-warning btn-block">Reset Password</button>
-        </div>
-
-        <!-- Hidden fields for API Key -->
-        <div class="form-group">
-            {{ form.gemini_api_key.label }}
-            {{ form.gemini_api_key(class_="form-control") }}
-            {% if form.gemini_api_key.errors %}
-                <div class="text-danger">
-                    {% for error in form.gemini_api_key.errors %}
-                        <p>{{ error }}</p>
-                    {% endfor %}
+                <!-- Reset Password Button -->
+                <div class="form-group mb-3">
+                    <button type="submit" class="btn btn-warning btn-block">Reset Password</button>
                 </div>
-            {% endif %}
+
+                <!-- Submit Button -->
+                <div class="form-group">{{ form.submit(class_="btn btn-primary btn-block") }}</div>
+            </form>
         </div>
-        <div class="form-group text-center">
-            {{ form.submit(class_="btn btn-primary btn-block") }}
-        </div>        
-    </form>
+    </div>
 </div>
 {% endblock %}

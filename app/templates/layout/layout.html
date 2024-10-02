@@ -12,20 +12,19 @@
     <div id="loading-icon" class="loading-icon" style="display: none;">
         <div class="spinner"></div>
     </div>    
-    <div id="connection-status" class="alert alert-warning d-none"></div>
     <div class="container-fluid">
         <div class="row">
             <button class="navbar-toggler d-md-none collapsed" type="button" data-toggle="collapse" data-target="#sidebar" aria-controls="sidebar" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon">
             </button>
-
             <nav class="navbar navbar-expand-md navbar-dark fixed-top bg-dark">
                 <div class="container-fluid">
                     <a class="navbar-brand" href="{{ url_for('root') }}">FreelancerAutoJob</a>
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
-                        <span class="navbar-toggler-icon">
+                        <span class="navbar-toggler-icon"></span>
                     </button>
                     <div class="collapse navbar-collapse" id="navbarCollapse">
+                        {% if request.endpoint != 'user.login' %}
                         <ul class="navbar-nav me-auto mb-2 mb-md-0">
                             <li class="nav-item">
                                 <a class="nav-link {% if request.endpoint == 'jobs.jobs' %}active{% endif %}" href="{{ url_for('jobs.jobs') }}">Jobs</a>
@@ -36,7 +35,7 @@
                                     <a class="nav-link dropdown-toggle {% if request.endpoint in ['admin.dashboard', 'admin.users', 'admin.roles'] %}active{% endif %}" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                         Admin
                                     </a>
-                                    <ul data-bs-auto-close="outside" class="dropdown-menu" aria-labelledby="adminDropdown">
+                                    <ul class="dropdown-menu" aria-labelledby="adminDropdown">
                                         <li><a class="dropdown-item" href="{{ url_for('admin.roles') }}">Manage Roles</a></li>
                                         <li><a class="dropdown-item" href="{{ url_for('admin.users') }}">Manage Users</a></li>
                                     </ul>
@@ -50,7 +49,7 @@
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link" href="{{ url_for('user.logout') }}">Logout</a>
-                                </li>                                
+                                </li>
                             {% else %}
                                 <li class="nav-item">
                                     <a class="nav-link {% if request.endpoint == 'user.login' %}active{% endif %}" href="{{ url_for('user.login') }}">Login</a>
@@ -60,19 +59,11 @@
                                 </li>
                             {% endif %}
                         </ul>
-                        {% if request.endpoint == 'jobs.jobs' %}
-                        <form class="d-flex" role="search" action="{{ url_for('jobs.jobs') }}" method="get">
-                            <input class="form-control me-2" type="search" name="search" placeholder="Search jobs" aria-label="Search">
-                            <button class="btn btn-outline-success" type="submit">Search</button>
-                        </form>
                         {% endif %}
-                        <span class="navbar-text ms-3">
-                            <connection-status></connection-status>
-                        
                     </div>
                 </div>
             </nav>
-
+            
             <main class="">
                 {% block content %}
                 {% endblock %}

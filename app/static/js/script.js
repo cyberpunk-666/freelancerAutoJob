@@ -39,7 +39,10 @@ function showConnectionStatus(message, is_success) {
 }
 
 function showLoadingIcon() {
-    document.getElementById('loading-icon').style.display = 'flex';
+    const loadingIcon = document.getElementById('loading-icon');
+    loadingIcon.style.display = 'flex';
+    // Force a reflow
+    void loadingIcon.offsetHeight;
 }
 
 function hideLoadingIcon() {

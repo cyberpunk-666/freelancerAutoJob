@@ -3,9 +3,10 @@ from app.db.db_utils import get_db
 from app.db.postgresdb import PostgresDB
 from app.models.api_response import APIResponse
 
+
 class RoleManager:
     def __init__(self):
-        self.db:PostgresDB = get_db()
+        self.db: PostgresDB = get_db()
         self.logger = logging.getLogger(__name__)
 
     def create_tables(self) -> APIResponse:
@@ -36,10 +37,7 @@ class RoleManager:
         """Create a new role."""
         self.logger.info(f"Creating role: {role_name}")
         try:
-            self.db.execute_query(
-                "INSERT INTO roles (role_name) VALUES (%s)",
-                (role_name,)
-            )
+            self.db.execute_query("INSERT INTO roles (role_name) VALUES (%s)", (role_name,))
             self.logger.info(f"Role '{role_name}' created successfully")
             return APIResponse(status="success", message=f"Role '{role_name}' created successfully")
         except Exception as e:
@@ -53,10 +51,7 @@ class RoleManager:
             # Get the role_id for the given role_name
             role_id = self._get_role_id_by_name(role_name)
             if role_id:
-                self.db.execute_query(
-                    "INSERT INTO user_roles (user_id, role_id) VALUES (%s, %s)",
-                    (user_id, role_id)
-                )
+                self.db.execute_query("INSERT INTO user_roles (user_id, role_id) VALUES (%s, %s)", (user_id, role_id))
                 self.logger.info(f"Role '{role_name}' assigned to user with ID {user_id} successfully")
                 return APIResponse(status="success", message=f"Role '{role_name}' assigned successfully")
             else:
@@ -72,10 +67,7 @@ class RoleManager:
             # Get the role_id for the given role_name
             role_id = self._get_role_id_by_name(role_name)
             if role_id:
-                self.db.execute_query(
-                    "DELETE FROM user_roles WHERE user_id = %s AND role_id = %s",
-                    (user_id, role_id)
-                )
+                self.db.execute_query("DELETE FROM user_roles WHERE user_id = %s AND role_id = %s", (user_id, role_id))
                 self.logger.info(f"Role '{role_name}' removed from user with ID {user_id} successfully")
                 return APIResponse(status="success", message=f"Role '{role_name}' removed successfully")
             else:
@@ -101,24 +93,23 @@ class RoleManager:
             self.logger.error(f"Failed to get roles for user with ID {user_id}: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message="Failed to retrieve roles")
 
-    def has_role(self, user_id, role_name) -> APIResponse:
+    def has_role(self, user_id, role_name) -> bool:
         """Check if a user has a specific role using role_name."""
         self.logger.info(f"Checking if user with ID {user_id} has role '{role_name}'")
         try:
             role_id = self._get_role_id_by_name(role_name)
             if role_id:
                 result = self.db.fetch_one(
-                    "SELECT COUNT(*) FROM user_roles WHERE user_id = %s AND role_id = %s",
-                    (user_id, role_id)
+                    "SELECT COUNT(*) FROM user_roles WHERE user_id = %s AND role_id = %s", (user_id, role_id)
                 )
                 has_role = result[0] > 0
                 self.logger.info(f"User with ID {user_id} {'has' if has_role else 'does not have'} role '{role_name}'")
-                return APIResponse(status="success", message="Role check successful", data={"has_role": has_role})
+                return has_role
             else:
-                return APIResponse(status="failure", message=f"Role '{role_name}' does not exist")
+                return False
         except Exception as e:
             self.logger.error(f"Failed to check role '{role_name}' for user with ID {user_id}: {str(e)}", exc_info=True)
-            return APIResponse(status="failure", message="Failed to check role")
+            return False
 
     def get_all_roles(self) -> APIResponse:
         """Get all available roles."""
@@ -175,10 +166,7 @@ class RoleManager:
         try:
             role_id = self._get_role_id_by_name(old_role_name)
             if role_id:
-                self.db.execute_query(
-                    "UPDATE roles SET role_name = %s WHERE role_id = %s",
-                    (new_role_name, role_id)
-                )
+                self.db.execute_query("UPDATE roles SET role_name = %s WHERE role_id = %s", (new_role_name, role_id))
                 self.logger.info(f"Role '{old_role_name}' updated to '{new_role_name}' successfully")
                 return APIResponse(status="success", message=f"Role '{old_role_name}' updated successfully")
             else:
@@ -212,7 +200,9 @@ class RoleManager:
             role = self.db.fetch_one("SELECT role_id, role_name FROM roles WHERE role_name = %s", (role_name,))
             if role:
                 self.logger.info(f"Role '{role_name}' retrieved successfully")
-                return APIResponse(status="success", message="Role retrieved successfully", data={"role_id": role[0], "role_name": role[1]})
+                return APIResponse(
+                    status="success", message="Role retrieved successfully", data={"role_id": role[0], "role_name": role[1]}
+                )
             else:
                 return APIResponse(status="failure", message=f"Role '{role_name}' does not exist")
         except Exception as e:

@@ -41,7 +41,7 @@ class JobApplicationProcessor:
                     stack.pop()
                     if not stack and json_start is not None:
                         json_str = input_string[json_start : i + 1]
-                        self.logger.info(f'Found JSON string: {json_str}')
+                        self.logger.info(f'Found JSON string')
                         json_obj = json.loads(json_str)
                         self.logger.info('JSON string is valid.')
                         return json.dumps(json_obj)
@@ -179,7 +179,7 @@ class JobApplicationProcessor:
         """Determine if the budget is acceptable based on the estimated time in hours and rate."""
         try:
             # Directly extract the estimated total time in hours from the analysis summary
-            estimated_hours = int(analysis_summary['total_estimated_time'].replace('hours', '').strip())
+            estimated_hours = float(analysis_summary['total_estimated_time'].replace('hours', '').strip())
 
             # Extract budget details
             min_budget = float(budget_info["min_budget_cad"])
@@ -439,6 +439,10 @@ class JobApplicationProcessor:
             if not job:
                 self.logger.error(f"Job with ID {job_id} not found.")
                 return
+
+            if job["gemini_results"] != {}:
+                self.logger.info("Job has been processed before.")
+                return
             self.logger.info(f"Processing job: {job['job_title']}")
 
             # Load the profile.txt content
@@ -493,7 +497,7 @@ class JobApplicationProcessor:
                 return
 
             # Generate the application letter
-            application_letter = self.generate_application_letter(job['job_description'], job['profile'])
+            application_letter = self.generate_application_letter(job['job_description'], profile)
             gemini_results["generate_application_letter"] = application_letter
             if not application_letter:
                 self._store_job_details(job, gemini_results, "error_generating_letter")

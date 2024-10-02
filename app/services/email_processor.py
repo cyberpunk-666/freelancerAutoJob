@@ -23,6 +23,8 @@ import smtplib
 import email
 import json
 from email.message import EmailMessage
+
+
 class EmailProcessor:
     def __init__(self):
         self.logger = logging.getLogger()
@@ -42,7 +44,6 @@ class EmailProcessor:
         # Instantiate the mailbox object
         self.mailbox = None
         self.send_message_callback = None
-        
 
     def is_connected(self):
         self.logger.debug("Checking connection status")
@@ -107,7 +108,7 @@ class EmailProcessor:
         except Exception as e:
             self.logger.error(f"Error connecting to {self.connection_type} server: {str(e)}")
             self.mailbox = None
-            
+
     def extract_links_from_body(self, body: str) -> APIResponse:
         self.logger.debug("Extracting links from email body")
         try:
@@ -127,7 +128,11 @@ class EmailProcessor:
             if div_element:
                 job_description = div_element.text.strip()
                 self.logger.info("Job description extracted successfully")
-                return APIResponse(status="success", message="Job description extracted successfully", data={"job_description": job_description})
+                return APIResponse(
+                    status="success",
+                    message="Job description extracted successfully",
+                    data={"job_description": job_description},
+                )
             else:
                 self.logger.info("No job description found")
                 return APIResponse(status="success", message="No job description found")
@@ -157,13 +162,15 @@ class EmailProcessor:
             if budget:
                 job_budget = budget.text.strip()
                 self.logger.info("Job budget extracted successfully")
-                return APIResponse(status="success", message="Job budget extracted successfully", data={"job_budget": job_budget})
+                return APIResponse(
+                    status="success", message="Job budget extracted successfully", data={"job_budget": job_budget}
+                )
             else:
                 self.logger.info("No job budget found")
                 return APIResponse(status="success", message="No job budget found")
         except Exception as e:
             self.logger.error(f"Error extracting job budget from HTML: {e}")
-            return APIResponse(status="failure", message="Error extracting job budget from HTML")   
+            return APIResponse(status="failure", message="Error extracting job budget from HTML")
 
     def extract_job_links(self, emails):
         self.logger.info("Extracting job links from emails")
@@ -181,7 +188,7 @@ class EmailProcessor:
                                 link_without_query = urlunparse(parsed_url._replace(query=""))
                                 if link_without_query.startswith(self.job_link_prefix):
                                     job_links.append(link_without_query)
-        
+
         self.logger.info(f"Extracted {len(job_links)} job links")
         return APIResponse(status="success", message=f"Extracted {len(job_links)} job links", data={"job_links": job_links})
 
@@ -200,13 +207,17 @@ class EmailProcessor:
                     "title": job_title.data.get("job_title"),
                     "description": job_description.data.get("job_description"),
                     "budget": job_budget.data.get("job_budget") if job_budget.status == "success" else None,
-                    "link": job_link
+                    "link": job_link,
                 }
                 self.logger.info("Job details scraped successfully")
-                return APIResponse(status="success", message="Job details scraped successfully", data={"job_detail": job_detail})
+                return APIResponse(
+                    status="success", message="Job details scraped successfully", data={"job_detail": job_detail}
+                )
             else:
                 self.logger.warning("Failed to extract all required details for job link")
-                return APIResponse(status="failure", message="Failed to extract all required details for job link", data={"link": job_link})
+                return APIResponse(
+                    status="failure", message="Failed to extract all required details for job link", data={"link": job_link}
+                )
 
         except Exception as e:
             self.logger.error(f"Error scraping job details from {job_link}: {str(e)}")
@@ -242,17 +253,17 @@ class EmailProcessor:
         self.mailbox.select('INBOX')
         search_criteria = f'FROM "{specific_email}"' if specific_email else 'ALL'
         _, message_numbers = self.mailbox.search(None, search_criteria)
-        
+
         email_ids = message_numbers[0].split()
         latest_emails = email_ids[-num_messages_to_read:]
-        
+
         emails = []
         for email_id in latest_emails:
             _, msg_data = self.mailbox.fetch(email_id, '(RFC822)')
             email_body = msg_data[0][1]
             email_message = email.message_from_bytes(email_body)
             emails.append(email_message)
-        
+
         self.logger.info(f"Fetched {len(emails)} IMAP emails")
         return emails
 
@@ -260,17 +271,17 @@ class EmailProcessor:
         self.logger.info(f"Fetching POP3 emails from {specific_email}")
         emails = []
         num_messages = len(self.mailbox.list()[1])
-        
+
         for i in range(num_messages, max(1, num_messages - num_messages_to_read), -1):
             raw_email = b"\n".join(self.mailbox.retr(i)[1])
             email_message = email.message_from_bytes(raw_email)
-            
+
             if not specific_email or (specific_email and specific_email.lower() in email_message['From'].lower()):
                 emails.append(email_message)
-            
+
             if len(emails) >= num_messages_to_read:
                 break
-        
+
         self.logger.info(f"Fetched {len(emails)} POP3 emails")
         return emails
 
@@ -281,7 +292,7 @@ class EmailProcessor:
                 "subject": email_obj["Subject"],
                 "from": email_obj["From"],
                 "to": email_obj["To"],
-                "body": email_obj.get_content()
+                "body": email_obj.get_content(),
             }
             self.logger.info("Email object serialized successfully")
             return json.dumps(email_dict)
@@ -293,13 +304,13 @@ class EmailProcessor:
         self.logger.debug("Deserializing email object")
         try:
             email_dict = json.loads(serialized_email)
-            
+
             email_obj = EmailMessage()
             email_obj["Subject"] = email_dict["subject"]
             email_obj["From"] = email_dict["from"]
             email_obj["To"] = email_dict["to"]
             email_obj.set_content(email_dict["body"])
-            
+
             self.logger.info("Email object deserialized successfully")
             return email_obj
         except json.JSONDecodeError:

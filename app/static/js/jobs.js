@@ -122,48 +122,35 @@ document.addEventListener('DOMContentLoaded', function () {
             body: JSON.stringify(payload)
         })
             .then(response => {
-                if (response.status != "success") {
-                    showConnectionStatus(`Network response did not succeed`, false);
-
-                    throw new Error('Network response did not succeed');
-                }
                 return response.json();
             })
             .then(data => {
-                console.log('Task added successfully:', data);
                 return data;
             })
             .catch(error => {
                 showConnectionStatus(`Error adding task to queue:`, false);
-                console.error('Error adding task to queue:', error);
-                throw error;
+                console.log('Error adding task to queue:', error);
             });
     }
 
     // Update the processSelected event listener
     if (processSelected) {
-        processSelected.addEventListener('click', function (e) {
+        processSelected.addEventListener('click', async function (e) {
             e.preventDefault();
             const selectedJobs = Array.from(document.querySelectorAll('.job-checkbox:checked'))
                 .map(checkbox => checkbox.dataset.jobId);
             showLoadingIcon()
+
             try {
-                selectedJobs.forEach(jobId => {
-                    addTaskToQueue("process_job", { job_id: jobId })
-                        .then(response => {
-                            console.log(`Job ${jobId} added to queue:`, response);
-                        })
-                        .catch(error => {
-                            console.error(`Failed to add job ${jobId} to queue:`, error);
-                            showConnectionStatus(`Failed to add job ${jobId} to queue`, false);
-                        });
-                });
+                for (let job of selectedJobs) {
+                    await addTaskToQueue("process_job", { job_id: job })
+                }
+                showConnectionStatus(`${selectedJobs.length} jobs added to queue`, true);
             } catch (error) {
                 showConnectionStatus(`Error adding jobs to queue:`, false);
                 console.error('Error adding jobs to queue:', error);
             } finally {
                 hideLoadingIcon();
-                showConnectionStatus(`${selectedJobs.length} jobs added to queue`, true);
             }
 
         });
