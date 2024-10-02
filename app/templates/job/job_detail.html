@@ -1,86 +1,108 @@
-{% extends "layout/layout.html" %}
+{% extends "layout/layout.html" %} {% block title %}Job Details{% endblock %} {% block content %}
 
-{% block title %}Job Details{% endblock %}
+<div class="container mt-4">
+    <h1 class="mb-4">{{ job['job_title'] }}</h1>
 
-{% block content %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2 class="card-title">Job Information</h2>
+        </div>
+        <div class="card-body">
+            <p><strong>Description:</strong> {{ job['job_description'] }}</p>
+            <p><strong>Budget:</strong> {{ job['budget'] }}</p>
+            <p><strong>Email Date:</strong> {{ job['email_date'] }}</p>
+            <p><strong>Status:</strong> {{ job['status'] }}</p>
+        </div>
+    </div>
 
-<h1>{{ job['job_title'] }}</h1>
-<div class="job-info">
-    <p><strong>Description:</strong> {{ job['job_description'] }}</p>
-    <p><strong>Budget:</strong> {{ job['budget'] }}</p>
-    <p><strong>Email Date:</strong> {{ job['email_date'] }}</p>
-    <p><strong>Status:</strong> {{ job['status'] }}</p>
-</div>
+    <h2 class="mb-3">Gemini Results</h2>
 
-<h3>Gemini Results:</h3>
-<div class="gemini-results">
-    <!-- Parse Budget Section -->
     {% if 'parse_budget' in job['gemini_results'] %}
-    <div class="result-section">
-        <h4>Parse Budget:</h4>
-        <ul>
-            <li><strong>Rate Type:</strong> {{ job['gemini_results']['parse_budget']['rate_type'] }}</li>
-            <li><strong>Max Budget (CAD):</strong> {{ job['gemini_results']['parse_budget']['max_budget_cad'] }}</li>
-            <li><strong>Min Budget (CAD):</strong> {{ job['gemini_results']['parse_budget']['min_budget_cad'] }}</li>
-        </ul>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">Parse Budget</h3>
+        </div>
+        <div class="card-body">
+            <ul class="list-unstyled">
+                <li><strong>Rate Type:</strong> {{ job['gemini_results']['parse_budget']['rate_type'] }}</li>
+                <li><strong>Max Budget (CAD):</strong> {{ job['gemini_results']['parse_budget']['max_budget_cad'] }}</li>
+                <li><strong>Min Budget (CAD):</strong> {{ job['gemini_results']['parse_budget']['min_budget_cad'] }}</li>
+            </ul>
+        </div>
+    </div>
+    {% endif %} {% if 'analyze_job_fit' in job['gemini_results'] %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">Analyze Job Fit</h3>
+        </div>
+        <div class="card-body">
+            <p><strong>Fit:</strong> {{ job['gemini_results']['analyze_job_fit']['fit'] }}</p>
+            <p><strong>Reasons:</strong> {{ job['gemini_results']['analyze_job_fit']['reasons'] }}</p>
+        </div>
+    </div>
+    {% endif %} {% if 'generate_detailed_steps' in job['gemini_results'] %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">Generate Detailed Steps</h3>
+        </div>
+        <div class="card-body">
+            <ol>
+                {% for step in job['gemini_results']['generate_detailed_steps'].get('steps', []) %}
+                <li>
+                    <h4>{{ step.get('title', 'No title') }}</h4>
+                    <div>{{ step.get('description', 'No description') | safe }}</div>
+                    <p><strong>Estimated Time:</strong> {{ step.get('estimatedTime', 'No estimated time') }}</p>
+                </li>
+                {% endfor %}
+            </ol>
+        </div>
+    </div>
+    {% endif %} {% if 'summarize_analysis' in job['gemini_results'] %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">Summarize Analysis</h3>
+        </div>
+        <div class="card-body">
+            <p><strong>Assumptions:</strong> {{ job['gemini_results']['summarize_analysis']['assumptions'] }}</p>
+            <p>
+                <strong>Total Estimated Time:</strong> {{ job['gemini_results']['summarize_analysis']['total_estimated_time'] }}
+            </p>
+            {% if job['gemini_results']['summarize_analysis']['additional_considerations'] %}
+            <p>
+                <strong>Additional Considerations:</strong> {{
+                job['gemini_results']['summarize_analysis']['additional_considerations'] }}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %} {% if 'generate_application_letter' in job['gemini_results'] %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">Generate Application Letter</h3>
+        </div>
+        <div class="card-body">
+            <h4>Introduction</h4>
+            <p>{{ job['gemini_results']['generate_application_letter'].get('introduction', 'No introduction') | safe }}</p>
+            <h4>Fit</h4>
+            <p>{{ job['gemini_results']['generate_application_letter'].get('fit', 'No fit information') | safe }}</p>
+            <h4>Approach</h4>
+            <p>{{ job['gemini_results']['generate_application_letter'].get('approach', 'No approach information') | safe }}</p>
+            <h4>Closing</h4>
+            <p>{{ job['gemini_results']['generate_application_letter'].get('closing', 'No closing information') | safe }}</p>
+        </div>
     </div>
     {% endif %}
 
-    <!-- Analyze Job Fit Section -->
-    {% if 'analyze_job_fit' in job['gemini_results'] %}
-    <div class="result-section">
-        <h4>Analyze Job Fit:</h4>
-        <p><strong>Fit:</strong> {{ job['gemini_results']['analyze_job_fit']['fit'] }}</p>
-        <p><strong>Reasons:</strong> {{ job['gemini_results']['analyze_job_fit']['reasons'] }}</p>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">Performance Metrics</h3>
+        </div>
+        <div class="card-body">
+            <pre>{{ job['performance_metrics'] | tojson(indent=2) }}</pre>
+        </div>
     </div>
-    {% endif %}
 
-    <!-- Generate Detailed Steps Section -->
-    {% if 'generate_detailed_steps' in job['gemini_results'] %}
-    <div class="result-section">
-        <h4>Generate Detailed Steps:</h4>
-        <ul>
-            {% for step in job['gemini_results']['generate_detailed_steps'].get('steps', []) %}
-            <li>
-                <strong>{{ step.get('title', 'No title') }}:</strong>
-                <div>{{ step.get('description', 'No description') | safe }}</div>
-                <p><strong>Estimated Time:</strong> {{ step.get('estimatedTime', 'No estimated time') }}</p>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
-
-    <!-- Summarize Analysis Section -->
-    {% if 'summarize_analysis' in job['gemini_results'] %}
-    <div class="result-section">
-        <h4>Summarize Analysis:</h4>
-        <p><strong>Assumptions:</strong> {{ job['gemini_results']['summarize_analysis']['assumptions'] }}</p>
-        <p><strong>Total Estimated Time:</strong> {{ job['gemini_results']['summarize_analysis']['total_estimated_time'] }}</p>
-        {% if job['gemini_results']['summarize_analysis']['additional_considerations'] %}
-        <p><strong>Additional Considerations:</strong> {{ job['gemini_results']['summarize_analysis']['additional_considerations'] }}</p>
-        {% endif %}
-    </div>
-    {% endif %}
-
-    <!-- Generate Application Letter Section -->
-    {% if 'generate_application_letter' in job['gemini_results'] %}
-    <div class="result-section">
-        <h4>Generate Application Letter:</h4>
-        <p><strong>Introduction:</strong> {{ job['gemini_results']['generate_application_letter'].get('introduction', 'No introduction') | safe }}</p>
-        <p><strong>Fit:</strong> {{ job['gemini_results']['generate_application_letter'].get('fit', 'No fit information') | safe }}</p>
-        <p><strong>Approach:</strong> {{ job['gemini_results']['generate_application_letter'].get('approach', 'No approach information') | safe }}</p>
-        <p><strong>Closing:</strong> {{ job['gemini_results']['generate_application_letter'].get('closing', 'No closing information') | safe }}</p>
-    </div>
-    {% endif %}
-
-<h3>Performance Metrics:</h3>
-<div class="performance-metrics">
-    {{ job['performance_metrics'] | tojson(indent=2) }}
+    <a href="{{ url_for('jobs.jobs') }}" class="btn btn-primary mb-4">Back to list</a>
 </div>
-
-<a href="{{ url_for('jobs.jobs') }}" class="back-link">Back to list</a>
-<!-- Custom JavaScript -->
-<script src="{{ url_for('static', filename='js/job_queue.js') }}"></script>
 
 {% endblock %}

@@ -17,16 +17,19 @@ import secrets
 import bcrypt
 from app.utils.crypto import Crypto
 from app.models.api_response import APIResponse
+
+
 class UserManager(UserMixin):
     def __init__(self):
-        self.db:PostgresDB = get_db()
+        self.db: PostgresDB = get_db()
         self.email_sender = EmailSender()
         self.logger = logging.getLogger(__name__)
 
     def create_table(self) -> APIResponse:
         """Create the users table if it doesn't exist."""
         try:
-            self.db.execute_query("""
+            self.db.execute_query(
+                """
                 CREATE TABLE IF NOT EXISTS users (
                     user_id SERIAL PRIMARY KEY,
                     email VARCHAR(255) UNIQUE NOT NULL,
@@ -39,24 +42,26 @@ class UserManager(UserMixin):
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     gemini_api_key VARCHAR(255)
                 )
-            """)
+            """
+            )
             self.logger.info("Users table created successfully")
             return APIResponse(status="success", message="Users table created successfully")
         except Exception as e:
             self.logger.error(f"Failed to create users table: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to create users table: {str(e)}")
-        
+
     def hash_password(self, password) -> APIResponse:
         """Hash the provided password."""
         try:
             hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
             verify_password_response = self.verify_password(hashed_password, password)
             self.logger.info("Password hashed successfully")
-            return APIResponse(status="success", message="Password hashed successfully", data={"hashed_password": hashed_password})
+            return APIResponse(
+                status="success", message="Password hashed successfully", data={"hashed_password": hashed_password}
+            )
         except Exception as e:
             self.logger.error(f"Failed to hash password: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to hash password: {str(e)}")
-
 
     def verify_password(self, hashed_password, password) -> APIResponse:
         """Verify the provided password against the hashed password."""
@@ -81,28 +86,21 @@ class UserManager(UserMixin):
 
                 self.db.execute_query(
                     "INSERT INTO users (email, password_hash, verification_token) VALUES (%s, %s, %s)",
-                    (email, password_hash, verification_token)
+                    (email, password_hash, verification_token),
                 )
 
                 verification_link = url_for('user.verify_email', token=verification_token, _external=True)
 
                 email_html = render_template(
-                    'emails/verification_email.html',
-                    user_name=email,
-                    verification_link=verification_link
+                    'emails/verification_email.html', user_name=email, verification_link=verification_link
                 )
 
                 email_text = render_template(
-                    'emails/verification_email.txt',
-                    user_name=email,
-                    verification_link=verification_link
+                    'emails/verification_email.txt', user_name=email, verification_link=verification_link
                 )
 
                 email_sent = self.email_sender.send_email(
-                    recipient=email,
-                    subject="Verify your email",
-                    html_body=email_html,
-                    text_body=email_text
+                    recipient=email, subject="Verify your email", html_body=email_html, text_body=email_text
                 )
 
                 if email_sent:
@@ -120,7 +118,7 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Sign up failed for {email}: {str(e)}", exc_info=True)
             return False
-        
+
     def get_user(self, user_id) -> APIResponse:
         """Retrieve a user's information by user_id and return a User object."""
         self.logger.info(f"Retrieving user with ID: {user_id}")
@@ -128,7 +126,9 @@ class UserManager(UserMixin):
             query = "SELECT user_id, email, is_active, email_verified, last_login FROM users WHERE user_id = %s"
             result = self.db.fetch_one(query, (user_id,))
             if result:
-                user = User(user_id=result[0], email=result[1], is_active=result[2], email_verified=result[3], last_login=result[4])
+                user = User(
+                    user_id=result[0], email=result[1], is_active=result[2], email_verified=result[3], last_login=result[4]
+                )
                 self.logger.info(f"User retrieved successfully: {user.email}")
                 return APIResponse(status="success", message="User retrieved successfully", data={"user": user})
             else:
@@ -143,7 +143,7 @@ class UserManager(UserMixin):
         self.logger.info(f"Retrieving user with ID: {user_id}")
         try:
             query = "SELECT user_id, email, gemini_api_key FROM users WHERE user_id = %s"
-            result = self.db.fetch_one(query, (user_id, ))
+            result = self.db.fetch_one(query, (user_id,))
             if result:
                 return APIResponse(status="success", message="User retrieved successfully", data={"user": result})
             else:
@@ -153,22 +153,21 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Failed to retrieve user with ID {user_id}: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to retrieve user with ID {user_id}: {str(e)}")
- 
-        
+
     def login(self, email, password) -> APIResponse:
         """Authenticate a user based on email, password, active status, and email verification."""
         self.logger.info(f"Login attempt for user: {email}")
-        
+
         try:
             query = "SELECT user_id, password_hash, is_active, email_verified FROM users WHERE email = %s"
             result = self.db.fetch_one(query, (email,))
-            
+
             if result:
                 user_id, stored_password_hash, is_active, email_verified = result
                 if not is_active:
                     self.logger.warning(f"Login failed for {email}: account is inactive")
                     return APIResponse(status="failure", message="Account is inactive")
-                
+
                 if not email_verified:
                     self.logger.warning(f"Login failed for {email}: email not verified")
                     return APIResponse(status="failure", message="Email not verified")
@@ -194,10 +193,7 @@ class UserManager(UserMixin):
             hash_password_response = self.hash_password(new_password)
             if hash_password_response.status == "success":
                 password_hash = hash_password_response.data["hashed_password"]
-                self.db.execute_query(
-                    "UPDATE users SET password_hash = %s WHERE email = %s",
-                    (password_hash, email)
-                )
+                self.db.execute_query("UPDATE users SET password_hash = %s WHERE email = %s", (password_hash, email))
                 self.logger.info(f"Password reset successful for user: {email}")
                 return APIResponse(status="success", message="Password reset successful")
             else:
@@ -214,21 +210,14 @@ class UserManager(UserMixin):
                 query = "SELECT user_id, email, created_at FROM users WHERE is_active = TRUE"
             else:
                 query = "SELECT user_id, email, created_at FROM users"
-                
+
             results = self.db.fetch_all(query)
-            users = [
-                {
-                    'user_id': row[0],
-                    'email': row[1],
-                    'created_at': row[2]
-                } for row in results
-            ]
+            users = [{'user_id': row[0], 'email': row[1], 'created_at': row[2]} for row in results]
             self.logger.info(f"Retrieved {len(users)} users successfully")
             return APIResponse(status="success", message="Users retrieved successfully", data={"users": users})
         except Exception as e:
             self.logger.error(f"Failed to retrieve users: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to retrieve users: {str(e)}")
-                
 
     def activate_user(self, user_id) -> APIResponse:
         """Activate a user account."""
@@ -335,7 +324,9 @@ class UserManager(UserMixin):
                 user = UserManager(*result)
                 return APIResponse(status="success", message="User found", data={"user": user})
             else:
-                self.db.execute_query("INSERT INTO users (google_id, email, email_verified) VALUES (%s, %s, TRUE)", (google_id, email))
+                self.db.execute_query(
+                    "INSERT INTO users (google_id, email, email_verified) VALUES (%s, %s, TRUE)", (google_id, email)
+                )
                 user = self.get_user_by_email(email)
                 if user:
                     return APIResponse(status="success", message="User created", data={"user": user})
@@ -362,10 +353,10 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Failed to retrieve password hash: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to retrieve password hash: {str(e)}")
-        
+
     def encrypt_sensible_data(self):
         crypto = Crypto()
-        
+
         # Implement encryption logic here
 
     def update_last_login(self, user_id) -> APIResponse:
@@ -380,7 +371,7 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Failed to update last login for user {user_id}: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to update last login for user {user_id}: {str(e)}")
-        
+
     def get_users(self) -> APIResponse:
         """Retrieve all users."""
         self.logger.info("Retrieving all users")
@@ -438,18 +429,16 @@ class UserManager(UserMixin):
         try:
             user_count = self.db.fetch_one("SELECT COUNT(*) FROM users")[0]
             role_count = self.db.fetch_one("SELECT COUNT(*) FROM roles")[0]
-            
+
             is_initialized = user_count > 0 and role_count > 0
-            
+
             if is_initialized:
                 self.logger.info("System has been initialized")
             else:
                 self.logger.info("System has not been initialized")
-            
+
             return APIResponse(
-                status="success",
-                message="System initialization check completed",
-                data={"initialized": is_initialized}
+                status="success", message="System initialization check completed", data={"initialized": is_initialized}
             )
         except Exception as e:
             self.logger.error(f"Failed to check system initialization: {str(e)}", exc_info=True)
@@ -460,11 +449,11 @@ class UserManager(UserMixin):
         try:
             hash_password_response = self.hash_password(password)
             if hash_password_response.status == "success":
-                
+
                 password_hash = hash_password_response.data["hashed_password"]
                 user_id = self.db.execute_query(
                     "INSERT INTO users (email, password_hash, email_verified) VALUES (%s, %s, %s) RETURNING user_id",
-                    (email, password_hash, True)
+                    (email, password_hash, True),
                 )
 
                 self.logger.info(f"User created successfully")
@@ -482,18 +471,16 @@ class UserManager(UserMixin):
             offset = (page - 1) * page_size
             users = []
             results = self.db.fetch_all(
-                "SELECT * FROM users WHERE email LIKE %s OR username LIKE %s LIMIT %s OFFSET %s",
-                (f"%{query}%", f"%{query}%", page_size, offset)
+                "SELECT * FROM users WHERE email LIKE %s LIMIT %s OFFSET %s", (f"%{query}%", page_size, offset)
             )
-            for result in results:
-                user = UserManager(*result)
+            for user in results:
                 users.append(user)
             self.logger.info(f"Found {len(users)} users matching the search query")
             return APIResponse(status="success", message="Users retrieved successfully", data={"users": users})
         except Exception as e:
             self.logger.error(f"Failed to search users: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to search users: {str(e)}")
-        
+
     def update_user(self, user_id, data):
         self.logger.info(f"Updating user with ID {user_id}")
         try:
@@ -504,7 +491,7 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Failed to update user {user_id}: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to update user {user_id}: {str(e)}")
-        
+
     def delete_user(self, user_id):
         self.logger.info(f"Deleting user with ID {user_id}")
         try:
@@ -515,7 +502,7 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Failed to delete user {user_id}: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to delete user {user_id}: {str(e)}")
-        
+
     def get_user_roles(self, user_id):
         self.logger.info(f"Retrieving roles for user with ID {user_id}")
         try:
@@ -531,7 +518,7 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Failed to retrieve roles for user {user_id}: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to retrieve roles for user {user_id}: {str(e)}")
-        
+
     def get_free_users(self, page=1, page_size=10):
         self.logger.info("Retrieving free users")
         try:
@@ -539,7 +526,7 @@ class UserManager(UserMixin):
             users = []
             results = self.db.fetch_all(
                 "SELECT user_id, email, is_active FROM users WHERE user_id NOT IN (SELECT user_id FROM user_roles) LIMIT %s OFFSET %s",
-                (page_size, offset)
+                (page_size, offset),
             )
             for result in results:
                 user = User(*result)
@@ -549,17 +536,17 @@ class UserManager(UserMixin):
         except Exception as e:
             self.logger.error(f"Failed to retrieve free users: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message=f"Failed to retrieve free users: {str(e)}")
-        
+
     def get_free_users_by_role(self, role_name=None, page=1, page_size=10):
         if role_name:
             self.logger.info(f"Retrieving users not in role: {role_name}")
         else:
             self.logger.info("Retrieving users not in any role")
-            
+
         try:
             offset = (page - 1) * page_size
             users = []
-            
+
             if role_name:
                 # Query for users not in the specified role
                 query = """
@@ -583,7 +570,7 @@ class UserManager(UserMixin):
                     LIMIT %s OFFSET %s
                 """
                 results = self.db.fetch_all(query, (page_size, offset))
-            
+
             for result in results:
                 user = User(*result)
                 users.append(user.toJson())
@@ -591,8 +578,10 @@ class UserManager(UserMixin):
             message = f"Users not in role {role_name}" if role_name else "Users not assigned to any role"
             self.logger.info(f"Retrieved {len(users)} {message}")
             return APIResponse(status="success", message=f"{message} retrieved successfully", data={"users": users})
-        
+
         except Exception as e:
-            error_message = f"Failed to retrieve users {f'not in role {role_name}' if role_name else 'not assigned to any role'}: {str(e)}"
+            error_message = (
+                f"Failed to retrieve users {f'not in role {role_name}' if role_name else 'not assigned to any role'}: {str(e)}"
+            )
             self.logger.error(error_message, exc_info=True)
             return APIResponse(status="failure", message=error_message)

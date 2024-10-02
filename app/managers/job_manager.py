@@ -13,35 +13,19 @@ from app.db.db_utils import get_db
 from enum import Enum, auto
 
 
-job_status = [{
-    "id": 1,
-    "name": "New",
-    "color": "green"
-},{
-    "id": 2,
-    "name": "In Progress",
-    "color": "yellow"
-},{
-    "id": 3,
-    "name": "Processed",
-    "color": "blue"
-},{
-    "id": 4,
-    "name": "Failed",
-    "color": "red"
-},{
-    "id": 5,
-    "name": "Not a Fit",
-    "color": "black"
-},{
-    "id": 6,
-    "name": "Applied",
-    "color": "purple"
-}]
+job_status = [
+    {"id": 1, "name": "New", "color": "green"},
+    {"id": 2, "name": "In Progress", "color": "yellow"},
+    {"id": 3, "name": "Processed", "color": "blue"},
+    {"id": 4, "name": "Failed", "color": "red"},
+    {"id": 5, "name": "Not a Fit", "color": "black"},
+    {"id": 6, "name": "Applied", "color": "purple"},
+]
+
 
 class JobManager:
     def __init__(self):
-        self.db:PostgresDB = get_db()
+        self.db: PostgresDB = get_db()
         self.logger = logging.getLogger(__name__)
 
     def create_table(self) -> APIResponse:
@@ -118,11 +102,7 @@ class JobManager:
     def apply_for_job(self, job_id, user_id) -> APIResponse:
         """Apply for a job."""
         try:
-            application_data = {
-                "job_id": job_id,
-                "user_id": user_id,
-                "status": "applied"
-            }
+            application_data = {"job_id": job_id, "user_id": user_id, "status": "applied"}
             self.db.add_object("job_applications", application_data)
             self.logger.info(f"User {user_id} applied for job {job_id}")
             return APIResponse(status="success", message="Job application submitted successfully")
@@ -140,12 +120,7 @@ class JobManager:
             """
             results = self.db.fetch_all(query, (job_id,))
             applications = [
-                {
-                    "application_id": row[0],
-                    "user_id": row[1],
-                    "status": row[2],
-                    "applied_at": row[3].isoformat()
-                }
+                {"application_id": row[0], "user_id": row[1], "status": row[2], "applied_at": row[3].isoformat()}
                 for row in results
             ]
             self.logger.info(f"Retrieved {len(applications)} applications for job {job_id}")
@@ -157,11 +132,7 @@ class JobManager:
     def update_application_status(self, application_id, new_status) -> APIResponse:
         """Update the status of a job application."""
         try:
-            self.db.update_object(
-                "job_applications",
-                {"status": new_status},
-                {"application_id": application_id}
-            )
+            self.db.update_object("job_applications", {"status": new_status}, {"application_id": application_id})
             self.logger.info(f"Updated application {application_id} status to {new_status}")
             return APIResponse(status="success", message="Application status updated successfully")
         except Exception as e:
@@ -184,7 +155,7 @@ class JobManager:
                     "job_title": row[1],
                     "company": row[2],
                     "status": row[3],
-                    "applied_at": row[4].isoformat()
+                    "applied_at": row[4].isoformat(),
                 }
                 for row in results
             ]
@@ -202,7 +173,7 @@ class JobManager:
             FROM job_details
             WHERE user_id = %s
             """
-            results = self.db.fetch_all(query, (user_id, ))
+            results = self.db.fetch_all(query, (user_id,))
             jobs = [
                 {
                     "job_id": row[0],
@@ -211,11 +182,11 @@ class JobManager:
                     "budget": row[3],
                     "email_date": row[4],
                     "gemini_results": row[5],
-                    "status": "Fetched",
+                    "status": row[6],
                     "performance_metrics": row[7],
                     "user_id": row[8],
                     "created_at": row[9],
-                    "status_id": row[10]
+                    "status_id": row[10],
                 }
                 for row in results
             ]
@@ -224,7 +195,6 @@ class JobManager:
         except Exception as e:
             self.logger.error(f"Failed to retrieve jobs for user {user_id}", exc_info=True)
             return APIResponse(status="failure", message="Failed to retrieve user jobs")
-        
 
     def fetch_and_store_jobs(self) -> APIResponse:
         """Fetch jobs from Freelancer API and store them in the database."""
@@ -232,7 +202,7 @@ class JobManager:
             user_preferences_manager = UserPreferencesManager()
             user_preferences_answer = user_preferences_manager.get_preferences(current_user.user_id)
             user_preferences = UserPreferencesManager.get_api_response_value(user_preferences_answer, 'value')
-            
+
             job_categories = user_preferences.get('job_categories', "")
             # split string into list
             job_categories = job_categories.split(",")
@@ -241,13 +211,13 @@ class JobManager:
 
             # Base URL for Freelancer API
             freelancer_api_base_url = "https://www.freelancer.com/api/projects/0.1/projects/active"
-            
+
             # Construct the jobs[] query parameters dynamically from job_categories
             job_params = "&".join([f"jobs[]={job}" for job in job_categories])
 
             # Build full URL, including the limit from environment variables
             freelancer_api_url = f"{freelancer_api_base_url}?limit={number_of_jobs_to_fetch}&offset=0&full_description&{job_params}&languages[]=en&sort_field=submitdate&compact=true"
-            
+
             # Make request to Freelancer API
             response = requests.get(freelancer_api_url)
             freelancer_data = response.json()
@@ -260,10 +230,7 @@ class JobManager:
                 for project in projects:
                     # Convert budget to user's currency
                     converted_budget = currency_conversion.convert_budget(
-                        project['currency']['code'], 
-                        user_currency, 
-                        project['budget']['minimum'], 
-                        project['budget']['maximum']
+                        project['currency']['code'], user_currency, project['budget']['minimum'], project['budget']['maximum']
                     )
 
                     # Prepare job data for insertion
@@ -277,20 +244,19 @@ class JobManager:
                             project.get('time_updated', project.get('time_submitted')), tz=timezone.utc
                         ),
                         'gemini_results': "{}",  # Placeholder for future use
-                        'status': project['status'],
+                        'status': "Fetched",
                         'performance_metrics': "{}",  # Placeholder for future use
                         'user_id': current_user.user_id,
-                        'status_id': 1  # Default status for new jobs
+                        'status_id': 1,  # Default status for new jobs
                     }
                     project["is_new"] = False
                     if self.get_job_by_id(job_id).data is None:
                         self.add_new_job(job_data)
                         job_list.append(job_data)
 
-
                 self.logger.info(f"Successfully fetched and stored {len(projects)} jobs for user {current_user.user_id}.")
                 return APIResponse(status="success", message="Jobs fetched and stored successfully", data=job_list)
-            
+
             else:
                 error_message = freelancer_data.get('message', 'No error message provided')
                 self.logger.error(f"Failed to fetch data from Freelancer API: {error_message}")

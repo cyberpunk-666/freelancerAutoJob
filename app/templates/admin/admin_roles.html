@@ -1,37 +1,67 @@
-{% extends "layout/layout.html" %}
+{% extends "layout/layout.html" %} {% block title %}Admin Dashboard{% endblock %} {% block content %}
+<h1 class="mb-4">Role Management</h1>
 
-{% block title %}Admin Dashboard{% endblock %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2 class="card-title">Roles</h2>
+            </div>
+            <div class="card-body">
+                <ul id="roleListItems" class="list-group mb-3"></ul>
+                <div class="input-group">
+                    <input type="text" id="newRoleName" class="form-control" placeholder="New role name" />
+                    <div class="input-group-append">
+                        <button class="btn btn-primary" onclick="createRole()">Create Role</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-{% block content %}
-<h1>Role Management</h1>
+    <div class="col-md-8">
+        <div class="card mb-4" id="roleDetails" style="display: none">
+            <div class="card-header">
+                <h2 class="card-title">Role Details</h2>
+            </div>
+            <div class="card-body">
+                <h3 id="currentRoleName" class="mb-3"></h3>
+                <button class="btn btn-primary mr-2" onclick="editRole()">Edit Role</button>
+                <button class="btn btn-danger" onclick="deleteRole()">Delete Role</button>
 
-<div id="roleList">
-    <h2>Roles</h2>
-    <ul id="roleListItems"></ul>
-    <input type="text" id="newRoleName" placeholder="New role name">
-    <button class="btn btn-primary" onclick="createRole()">Create Role</button>
+                <h4 class="mt-4">Users in Role</h4>
+                <ul id="usersInRole" class="list-group mb-3"></ul>
+                <div class="input-group mb-3">
+                    <select id="freeUsersList" class="form-control"></select>
+                    <div class="input-group-append">
+                        <button class="btn btn-primary" onclick="addUserToRole()">Add User to Role</button>
+                    </div>
+                </div>
+
+                <h4>Remove User from Role</h4>
+                <div class="input-group">
+                    <select id="roleUsersList" class="form-control"></select>
+                    <div class="input-group-append">
+                        <button class="btn btn-primary" onclick="removeUserFromRole()">Remove User</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div id="roleDetails" style="display: none;">
-    <h2>Role Details</h2>
-    <h3 id="currentRoleName"></h3>
-    <button class="btn btn-primary" onclick="editRole()">Edit Role</button>
-    <button class="btn btn-primary" onclick="deleteRole()">Delete Role</button>
-
-    <h3>Users in Role</h3>
-    <ul id="usersInRole"></ul>
-    <select id="freeUsersList"></select>
-    <button class="btn btn-primary" onclick="addUserToRole()">Add User to Role</button>
-
-    <h3>Remove User from Role</h3>
-    <select id="roleUsersList"></select>
-    <button class="btn btn-primary" onclick="removeUserFromRole()">Remove User</button>
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Users without Role</h2>
+            </div>
+            <div class="card-body">
+                <ul id="freeUserList" class="list-group"></ul>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div id="freeUsers">
-    <h2>Users without Role</h2>
-    <ul id="freeUserList"></ul>
-</div>
 <script src="{{ url_for('static', filename='js/roles.js') }}"></script>
 {% endblock %}
-

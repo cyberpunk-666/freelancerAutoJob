@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Logic for ajax Select
     const ajaxSelects = document.querySelectorAll('select[data-url]');
     ajaxSelects.forEach(select => {
@@ -38,3 +38,10 @@ function showConnectionStatus(message, is_success) {
     }, 3000);
 }
 
+function showLoadingIcon() {
+    document.getElementById('loading-icon').style.display = 'flex';
+}
+
+function hideLoadingIcon() {
+    document.getElementById('loading-icon').style.display = 'none';
+}

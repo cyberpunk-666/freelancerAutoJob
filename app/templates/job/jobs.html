@@ -3,6 +3,7 @@
     <button class="btn btn-primary" id="fetch-jobs-btn">Manually Fetch Jobs</button>
     <div class="btn-group ml-2" id="action-menu">
         <button
+            disabled
             class="btn btn-secondary dropdown-toggle"
             type="button"
             id="dropdownMenuButton"
@@ -42,7 +43,9 @@
                 <input type="checkbox" class="job-checkbox" data-job-id="{{ job['job_id'] }}" aria-label="Select job" />
             </td>
             <td>
-                <a href="{{ url_for('jobs.job_detail', job_id=job['job_id']) }}" class="text-info"> {{ job["job_title"] }} </a>
+                <a href="{{ url_for('jobs.job_detail', job_id=job['job_id']) }}" class="text-info">
+                    {{ job["job_title"] | truncate_title(80)}}
+                </a>
             </td>
             <td>{{ job["budget"] }}</td>
             <td>{{ job['created_at'] | datetime('%Y-%m-%d %H:%M') }}</td>

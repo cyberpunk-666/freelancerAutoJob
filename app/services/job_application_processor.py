@@ -14,6 +14,8 @@ from app.db.db_utils import get_api_response_value
 from app.managers.job_manager import JobManager
 from app.managers.user_preferences_manager import UserPreferencesManager
 from app.services.email_sender import EmailSender
+
+
 class JobApplicationProcessor:
     def __init__(self):
         self.email_sender = EmailSender()
@@ -38,7 +40,7 @@ class JobApplicationProcessor:
                 elif char == '}':
                     stack.pop()
                     if not stack and json_start is not None:
-                        json_str = input_string[json_start:i + 1]
+                        json_str = input_string[json_start : i + 1]
                         self.logger.info(f'Found JSON string: {json_str}')
                         json_obj = json.loads(json_str)
                         self.logger.info('JSON string is valid.')
@@ -59,7 +61,6 @@ class JobApplicationProcessor:
             time.sleep(time_to_wait)
         self.last_api_call_time = time.time()
 
-
     def send_to_gemini(self, prompt, response_schema=None, max_tokens=4000, max_retries=5):
         """Send a prompt to the Gemini model and return the response based on the provided schema."""
         self.delay_if_necessary()  # Ensure rate limiting
@@ -76,27 +77,19 @@ class JobApplicationProcessor:
                 querystring = {"key": self.gemini_api_key}
 
                 data = {
-                    "contents": [
-                        {
-                            "parts": [
-                                {"text": prompt}
-                            ]
-                        }
-                    ],
+                    "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {
                         "temperature": 1,
                         "topK": 64,
                         "topP": 0.95,
                         "maxOutputTokens": max_tokens,
                         "responseMimeType": "application/json",
-                        "responseSchema": response_schema
-                    }
+                        "responseSchema": response_schema,
+                    },
                 }
 
                 payload = json.dumps(data)
-                headers = {
-                    'Content-Type': 'application/json'
-                }
+                headers = {'Content-Type': 'application/json'}
 
                 response = requests.post(url, headers=headers, params=querystring, data=payload)
                 response.raise_for_status()
@@ -115,12 +108,14 @@ class JobApplicationProcessor:
 
                 if response is not None and response.status_code == 429:
                     retries += 1
-                    wait_time = 2 ** retries  # Exponential backoff
-                    self.logger.warning(f"Too many requests. Retrying in {wait_time} seconds (Attempt {retries}/{max_retries}).")
+                    wait_time = 2**retries  # Exponential backoff
+                    self.logger.warning(
+                        f"Too many requests. Retrying in {wait_time} seconds (Attempt {retries}/{max_retries})."
+                    )
                     time.sleep(wait_time)
                 else:
                     break  # Exit loop if the error is not due to rate limiting
-            
+
         self.logger.error(f"Exceeded maximum retries for prompt: {prompt}")
         return None
 
@@ -141,12 +136,9 @@ class JobApplicationProcessor:
             "properties": {
                 "min_budget_cad": {"type": "number", "format": "float"},
                 "max_budget_cad": {"type": "number", "format": "float"},
-                "rate_type": {
-                    "type": "string",
-                    "enum": ["hourly", "fixed"]
-                }
+                "rate_type": {"type": "string", "enum": ["hourly", "fixed"]},
             },
-            "required": ["min_budget_cad", "max_budget_cad", "rate_type"]
+            "required": ["min_budget_cad", "max_budget_cad", "rate_type"],
         }
 
         response_text = self.send_to_gemini(prompt, response_schema)
@@ -162,8 +154,7 @@ class JobApplicationProcessor:
                     return None
                 return json.loads(json_str)
             except json.JSONDecodeError:
-                self.logger.error(
-                    f"Failed to decode structured response: {response_text}")
+                self.logger.error(f"Failed to decode structured response: {response_text}")
                 return None
         return None
 
@@ -212,7 +203,7 @@ class JobApplicationProcessor:
             self.logger.info(f"Total estimated time: {estimated_hours} hours")
             self.logger.info(f"Total cost: {total_cost:.2f}, Budget range: {min_budget} - {max_budget}")
             self.logger.info(f"Is budget acceptable: {is_acceptable}")
-            
+
             return is_acceptable
 
         except ValueError as e:
@@ -240,9 +231,9 @@ class JobApplicationProcessor:
                 "introduction": {"type": "string"},
                 "fit": {"type": "string"},
                 "approach": {"type": "string"},
-                "closing": {"type": "string"}
+                "closing": {"type": "string"},
             },
-            "required": ["introduction", "fit", "approach", "closing"]
+            "required": ["introduction", "fit", "approach", "closing"],
         }
 
         # Send the prompt to Gemini with the response schema
@@ -254,8 +245,7 @@ class JobApplicationProcessor:
                     return None
                 return json.loads(json_str)
             except json.JSONDecodeError:
-                self.logger.error(
-                    f"Failed to decode structured response: {response_text}")
+                self.logger.error(f"Failed to decode structured response: {response_text}")
                 return None
         return None
 
@@ -269,11 +259,8 @@ class JobApplicationProcessor:
 
         response_schema = {
             "type": "object",
-            "properties": {
-                "estimated_time": {"type": "string"},
-                "assumptions": {"type": "string"}
-            },
-            "required": ["estimated_time", "assumptions"]
+            "properties": {"estimated_time": {"type": "string"}, "assumptions": {"type": "string"}},
+            "required": ["estimated_time", "assumptions"],
         }
 
         response_text = self.send_to_gemini(prompt, response_schema)
@@ -284,8 +271,7 @@ class JobApplicationProcessor:
                     return None
                 return json.loads(json_str)
             except json.JSONDecodeError:
-                self.logger.error(
-                    f"Failed to decode structured response: {response_text}")
+                self.logger.error(f"Failed to decode structured response: {response_text}")
                 return None
         return None
 
@@ -300,15 +286,8 @@ class JobApplicationProcessor:
 
         response_schema = {
             "type": "object",
-            "properties": {
-                "fit": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 5
-                },
-                "reasons": {"type": "string"}
-            },
-            "required": ["fit", "reasons"]
+            "properties": {"fit": {"type": "integer", "minimum": 1, "maximum": 5}, "reasons": {"type": "string"}},
+            "required": ["fit", "reasons"],
         }
 
         response_text = self.send_to_gemini(prompt, response_schema)
@@ -319,14 +298,13 @@ class JobApplicationProcessor:
                     return None
                 return json.loads(json_str)
             except json.JSONDecodeError:
-                self.logger.error(
-                    f"Failed to decode structured response: {response_text}")
+                self.logger.error(f"Failed to decode structured response: {response_text}")
                 return None
         return None
 
-
-
-    def send_email(self, job_title, job_description, estimated_time, assumptions, budget_text, application_letter, detailed_steps):
+    def send_email(
+        self, job_title, job_description, estimated_time, assumptions, budget_text, application_letter, detailed_steps
+    ):
         """Send an email with the application details for the job."""
         subject = f"Application for {job_title}"
         body = f"""
@@ -342,11 +320,10 @@ class JobApplicationProcessor:
 
         try:
             self.email_sender.send_email(recipient, subject, body)
-            self.logger.info(
-                f"Application email sent to {recipient} for job {job_title}.")
+            self.logger.info(f"Application email sent to {recipient} for job {job_title}.")
         except Exception as e:
             error_details = traceback.format_exc()
-            self.logger.error(f"Failed to send application email: {e}\n{error_details}")            
+            self.logger.error(f"Failed to send application email: {e}\n{error_details}")
 
     def summarize_analysis(self, detailed_steps):
         """Summarize the analysis including the total estimated time and assumptions."""
@@ -365,20 +342,17 @@ class JobApplicationProcessor:
         response_schema = {
             "type": "object",
             "properties": {
-                "assumptions": {
-                    "type": "string",
-                    "description": "Assumptions made during the time estimation process."
-                },
+                "assumptions": {"type": "string", "description": "Assumptions made during the time estimation process."},
                 "total_estimated_time": {
                     "type": "string",
-                    "description": "Total estimated time in hours, formatted as 'XXX hours'. Ensure the time is calculated in hours."
+                    "description": "Total estimated time in hours, formatted as 'XXX hours'. Ensure the time is calculated in hours.",
                 },
                 "additional_considerations": {
                     "type": "string",
-                    "description": "Any additional considerations or challenges that could affect the project."
-                }
+                    "description": "Any additional considerations or challenges that could affect the project.",
+                },
             },
-            "required": ["assumptions", "total_estimated_time"]
+            "required": ["assumptions", "total_estimated_time"],
         }
 
         # Send the prompt to Gemini with the response schema
@@ -394,8 +368,6 @@ class JobApplicationProcessor:
                 return None
         return None
 
-
-
     def get_detailed_steps(self, job_description):
         """Generate detailed steps for approaching the job based on the description."""
         prompt = f"""
@@ -404,7 +376,7 @@ class JobApplicationProcessor:
         Write a detailed step-by-step plan to approach the tasks described in the job description.
         Provide the response in a clear, structured format.
         """
-        
+
         # Define the response schema
         response_schema = {
             "type": "object",
@@ -416,13 +388,13 @@ class JobApplicationProcessor:
                         "properties": {
                             "title": {"type": "string"},
                             "description": {"type": "string"},
-                            "estimatedTime": {"type": "string"}
+                            "estimatedTime": {"type": "string"},
                         },
-                        "required": ["title", "description", "estimatedTime"]
-                    }
+                        "required": ["title", "description", "estimatedTime"],
+                    },
                 }
             },
-            "required": ["steps"]
+            "required": ["steps"],
         }
 
         # Send the prompt to Gemini with the response schema
@@ -434,8 +406,7 @@ class JobApplicationProcessor:
                     return None
                 return json.loads(json_str)
             except json.JSONDecodeError:
-                self.logger.error(
-                    f"Failed to decode structured response: {response_text}")
+                self.logger.error(f"Failed to decode structured response: {response_text}")
                 return None
         return None
 
@@ -448,17 +419,19 @@ class JobApplicationProcessor:
         else:
             self.logger.error(f"Profile file {profile_path} not found.")
             return ""
-        
+
     def process_job(self, user_id, job_id):
         """Process a single job by analyzing, preparing an application letter, and sending an email."""
         try:
             user_prefrences_manager = UserPreferencesManager()
             user_preferences_answer = user_prefrences_manager.get_preferences(user_id)
             user_preferences = UserPreferencesManager.get_api_response_value(user_preferences_answer, 'value')
-            
+
             job_does_not_fit_threshold = int(user_preferences.get('job_does_not_fit_threshold', 3))
             process_job_even_if_job_does_not_fit = bool(user_preferences.get('process_job_even_if_job_does_not_fit', False))
-            generate_application_letter_even_if_budget_not_acceptable = bool(user_preferences.get('generate_application_letter_even_if_budget_not_acceptable', False))
+            generate_application_letter_even_if_budget_not_acceptable = bool(
+                user_preferences.get('generate_application_letter_even_if_budget_not_acceptable', False)
+            )
 
             job_manager = JobManager()
             job_response = job_manager.get_job_by_id(job_id)
@@ -467,7 +440,7 @@ class JobApplicationProcessor:
                 self.logger.error(f"Job with ID {job_id} not found.")
                 return
             self.logger.info(f"Processing job: {job['job_title']}")
-            
+
             # Load the profile.txt content
             profile = self.load_profile()
 
@@ -480,7 +453,7 @@ class JobApplicationProcessor:
                 self._store_job_details(job, gemini_results, "error analyzing job fit")
                 self.logger.error(f"Failed to analyze job fit for job '{job['job_title']}'")
                 return
-
+            job["job_fit"] = job_fit['fit']
             if job_fit['fit'] < job_does_not_fit_threshold and not process_job_even_if_job_does_not_fit:
                 self._store_job_details(job, gemini_results, "not fitting")
                 self.logger.info(f"Skipping job '{job['job_title']}' because it does not fit the freelancer's profile.")
@@ -511,7 +484,10 @@ class JobApplicationProcessor:
                 return
 
             # Check if the budget is acceptable
-            if not self.is_budget_acceptable(analysis_summary, budget_info) and not generate_application_letter_even_if_budget_not_acceptable:
+            if (
+                not self.is_budget_acceptable(analysis_summary, budget_info)
+                and not generate_application_letter_even_if_budget_not_acceptable
+            ):
                 self._store_job_details(job, gemini_results, "budget_not_acceptable")
                 self.logger.info(f"Skipping job '{job['job_title']}' because the budget is not acceptable.")
                 return
@@ -526,8 +502,13 @@ class JobApplicationProcessor:
 
             # Send the application email
             self.send_email(
-                job['job_title'], job['job_description'], analysis_summary['total_estimated_time'],
-                analysis_summary['assumptions'], job['budget'], application_letter, detailed_steps
+                job['job_title'],
+                job['job_description'],
+                analysis_summary['total_estimated_time'],
+                analysis_summary['assumptions'],
+                job['budget'],
+                application_letter,
+                detailed_steps,
             )
             self._store_job_details(job, gemini_results, "processed")
 
@@ -544,7 +525,6 @@ class JobApplicationProcessor:
         job["gemini_results"] = gemini_results or {}
         job["status"] = status
         job["performance_metrics"] = performance_metrics or {}
-
+        self.logger.info(f"Updating job '{job['job_title']}' with status '{status}'.")
         job_manager = JobManager()
         job_manager.update_job(job)
-        

@@ -40,13 +40,14 @@ async function getUser(userId) {
 // Function to search users
 async function searchUsers(query) {
     try {
-        const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
+        let params = new URLSearchParams(query).toString()
+        const response = await fetch(`/api/users/search?${params}`);
         if (!response.ok) {
             throw new Error('Failed to search users');
         }
         const data = await response.json();
         if (data.status == "success") {
-            return data.data;
+            return data.data["users"];
         } else {
             throw new Error(data.message || 'Failed to search users');
         }
