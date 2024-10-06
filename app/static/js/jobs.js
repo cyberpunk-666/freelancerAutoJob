@@ -1,6 +1,11 @@
 document.addEventListener('DOMContentLoaded', function () {
     const fetchJobsBtn = document.getElementById('fetch-jobs-btn');
     let jobsTable;
+    let pollingInterval = null;
+    let emptyResponseCount = 0;
+    const MAX_EMPTY_RESPONSES = 20; // Stop after 20 empty responses (adjust as needed)
+    const POLLING_INTERVAL = 1000; // 1 second interval
+
 
     function initializeDataTable() {
         jobsTable = $('#jobsTable').DataTable({
@@ -17,10 +22,16 @@ document.addEventListener('DOMContentLoaded', function () {
             "stateLoadCallback": function (settings) {
                 return JSON.parse(sessionStorage.getItem('DataTables_' + settings.sInstance));
             },
+            select: true,
+            select: {
+                style: 'multi',
+                selector: 'td:first-child'
+            },
             columnDefs: [
                 {
-                    targets: 0, // Checkbox column
-                    orderable: false
+                    orderable: false,
+                    className: 'select-checkbox',
+                    targets: 0
                 },
                 {
                     targets: 2, // Budget column
@@ -32,12 +43,40 @@ document.addEventListener('DOMContentLoaded', function () {
                         }
                         return data;
                     }
+                },
+                {
+                    targets: 4, // Fit column
+                    render: function (data, type, row) {
+                        if (type === 'display') {
+                            return data != null && data != "None" ? data.toString() : '';
+                        }
+                        return data;
+                    }
                 }
             ]
         });
+
+        jobsTable.on('select deselect', function (e, dt, type, cell, originalEvent) {
+            const selectedRows = jobsTable.rows({ selected: true }).data().length;
+
+            // Enable/disable action links based on selection
+            $('#process-selected, #delete-selected').toggleClass('disabled', selectedRows === 0);
+        });
+        return jobsTable
     }
 
+    // Function to update jobs in DataTable
+    function updateJobsInDataTable(jobs) {
+        for (let job of jobs) {
+            // Find the row with matching job_id in the DataTable
+            const row = jobsTable.row(`#${job.job_id}`);
 
+            if (row) {
+                // Update the row data, assuming columns: job_id, job_title, status, job_fit
+                row.data([job.job_id, job.job_title, job.status, job.job_fit]);
+            }
+        }
+    }
     function fetchJobs() {
         showLoadingIcon()
         try {
@@ -45,12 +84,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 .then(response => response.json())
                 .then(apiResponse => {
                     if (apiResponse.status != 'success') {
-                        showConnectionStatus(apiResponse.message, false);
+                        showConnectionStatus(apiResponse.message, "error");
                         return;
                     }
                     const newJobs = apiResponse.data;
                     if (newJobs.length == 0) {
-                        showConnectionStatus('No new job found', true);
+                        showConnectionStatus('No new job found', "success");
                         return;
                     }
                     newJobs.forEach(job => {
@@ -66,15 +105,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     // Redraw the table
                     jobsTable.draw();
-                    showConnectionStatus(`${newJobs.length} new jobs found`, true);
+                    showConnectionStatus(`${newJobs.length} new jobs found`, "success");
                 })
                 .catch(error => {
                     console.error('Error fetching jobs:', error);
-                    showConnectionStatus('Error fetching jobs', false);
+                    showConnectionStatus('Error fetching jobs', "error");
                 });
         } catch (error) {
             console.error('Error fetching jobs:', error);
-            showConnectionStatus('Error fetching jobs', false);
+            showConnectionStatus('Error fetching jobs', "error");
         } finally {
             hideLoadingIcon();
         }
@@ -84,29 +123,58 @@ document.addEventListener('DOMContentLoaded', function () {
         fetchJobsBtn.addEventListener('click', fetchJobs);
     }
 
-    // Checkbox management
-    const selectAll = document.getElementById('select-all');
-    const jobCheckboxes = document.querySelectorAll('.job-checkbox');
-    const actionMenu = document.getElementById('action-menu');
-    const actionButton = actionMenu.querySelector('button');
-    const processSelected = document.getElementById('process-selected');
-    const deleteSelected = document.getElementById('delete-selected');
+    // Handle "Select All" checkbox
+    $('#select-all').on('change', function () {
+        var isChecked = this.checked;
+        jobsTable.rows().nodes().to$().find('input[type="checkbox"]').prop('checked', isChecked);
+        jobsTable.rows().select(isChecked);
 
-    function updateActionMenu() {
-        const checkedBoxes = document.querySelectorAll('.job-checkbox:checked');
-        actionButton.disabled = checkedBoxes.length === 0;
-    }
-
-    if (selectAll) {
-        selectAll.addEventListener('change', function () {
-            jobCheckboxes.forEach(checkbox => checkbox.checked = this.checked);
-            updateActionMenu();
-        });
-    }
-
-    jobCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', updateActionMenu);
+        // Update action buttons
+        var selectedRows = isChecked ? jobsTable.rows().count() : 0;
+        $('#process-selected, #delete-selected').toggleClass('disabled', selectedRows === 0);
     });
+
+    $('#process-selected').on('click', async function (e) {
+        e.preventDefault();
+        if ($(this).hasClass('disabled')) return;
+
+        try {
+            showLoadingIcon();
+            const selectedRowsCount = jobsTable.rows({ selected: true }).count();
+            jobsTable.rows({ selected: true }).every(async function (rowIdx, tableLoop, rowLoop) {
+                var cellData = this.data();
+                var checkboxHtml = cellData[0]; // Get the HTML string for the first cell
+                var jobId = $(checkboxHtml).data('job-id'); // Extract the job ID from the data-job-id attribute
+                await addTaskToQueue("process_job", { job_id: jobId });
+            });
+            showConnectionStatus(`${selectedRowsCount} jobs added to queue`, true);
+            startPolling()
+        } catch (error) {
+            showConnectionStatus(`Error adding jobs to queue:`, false);
+            console.error('Error adding jobs to queue:', error);
+        } finally {
+            hideLoadingIcon();
+        }
+    });
+
+    // Delete selected jobs
+    $('#delete-selected').on('click', function () {
+        var selectedJobIds = [];
+        jobsTable.rows({ selected: true }).every(function (rowIdx, tableLoop, rowLoop) {
+            var jobId = this.data()['job_id'];
+            selectedJobIds.push(jobId);
+        });
+        console.log('Deleting jobs:', selectedJobIds);
+        // Add your deletion logic here
+    });
+
+    // start-polling
+    $('#start-polling').on('click', function () {
+        startPolling();
+    });
+    // Initial state of buttons
+    $('#process-selected, #delete-selected').attr('disabled', true);
+
 
     function addTaskToQueue(taskType, taskData) {
         const payload = {
@@ -128,58 +196,105 @@ document.addEventListener('DOMContentLoaded', function () {
                 return data;
             })
             .catch(error => {
-                showConnectionStatus(`Error adding task to queue:`, false);
                 console.log('Error adding task to queue:', error);
             });
     }
 
-    // Update the processSelected event listener
-    if (processSelected) {
-        processSelected.addEventListener('click', async function (e) {
-            e.preventDefault();
-            const selectedJobs = Array.from(document.querySelectorAll('.job-checkbox:checked'))
-                .map(checkbox => checkbox.dataset.jobId);
-            showLoadingIcon()
+    let lastSyncDate = new Date().toISOString(); // Start polling from current time
+    let pollingTimeout;
 
-            try {
-                for (let job of selectedJobs) {
-                    await addTaskToQueue("process_job", { job_id: job })
-                }
-                showConnectionStatus(`${selectedJobs.length} jobs added to queue`, true);
-            } catch (error) {
-                showConnectionStatus(`Error adding jobs to queue:`, false);
-                console.error('Error adding jobs to queue:', error);
-            } finally {
-                hideLoadingIcon();
+    async function pollEndpoints() {
+        try {
+            clearTimeout(pollingTimeout); // Clear any existing timeout
+
+            const [queueResponse, jobUpdatesResponse] = await Promise.all([
+                fetch('/api/task_queue/task_count'),
+                fetch(`/api/jobs/poll-updates?last_sync=${lastSyncDate}`)
+            ]);
+
+            const queueResult = await queueResponse.json();
+            const jobUpdatesResult = await jobUpdatesResponse.json();
+
+            let totalTasks = 0;
+            let statusMessage = "";
+
+            if (queueResult.status === "success") {
+                const messageCount = queueResult.data.task_count;
+                totalTasks += messageCount;
+                updateTaskCount(messageCount);
+            } else {
+                console.error("Error fetching queue message count:", queueResult.message);
+                statusMessage += "Queue error. ";
             }
 
-        });
+            if (jobUpdatesResult.status === "success") {
+                const updatedJobs = jobUpdatesResult.data;
+                totalTasks += updatedJobs.length;
+                if (updatedJobs.length > 0) {
+                    updateJobsInDataTable(updatedJobs);
+                    lastSyncDate = new Date().toISOString();
+                    statusMessage += `${updatedJobs.length} jobs updated.`;
+                }
+            } else {
+                console.error("Error fetching job updates:", jobUpdatesResult.message);
+                statusMessage += "Job update error.";
+            }
+
+            // Reset empty response count if we received any updates
+            if (totalTasks > 0) {
+                emptyResponseCount = 0;
+                if (statusMessage)
+                    showConnectionStatus(statusMessage, "success", 0, 3000);
+            } else {
+                emptyResponseCount++;
+                if (emptyResponseCount >= MAX_EMPTY_RESPONSES) {
+                    stopPolling();
+                    showConnectionStatus("Polling stopped: No recent updates", "info", 0, 3000);
+                    return; // Exit the function to prevent scheduling next poll
+                }
+            }
+
+            // Schedule the next poll only after processing is complete
+            pollingTimeout = setTimeout(pollEndpoints, POLLING_INTERVAL);
+        } catch (error) {
+            console.error("Polling error:", error);
+            showConnectionStatus("Connection error", "error", 0, 3000);
+            stopPolling();
+        }
+    }
+
+    function startPolling() {
+        if (!pollingInterval) {
+            emptyResponseCount = 0;
+            showConnectionStatus("Polling...", "loading", 0);
+            pollEndpoints(); // Start polling immediately
+        }
+    }
+    function stopPolling() {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            hideConnectionStatus()
+            pollingInterval = null;
+            emptyResponseCount = 0;
+            stickyStatus = null
+        }
     }
 
 
-    if (deleteSelected) {
-        deleteSelected.addEventListener('click', function (e) {
-            e.preventDefault();
-            const selectedJobs = Array.from(document.querySelectorAll('.job-checkbox:checked'))
-                .map(checkbox => checkbox.dataset.jobId);
-            console.log('Deleting jobs:', selectedJobs);
-            // Add your logic to delete the selected jobs
-        });
-    }
+
 
     // Initialize DataTable on document ready
     $(document).ready(function () {
-        jobsTable = initializeDataTable();
+        initializeDataTable();
+
+        // Disable/enable action buttons based on selected rows
+        const processSelected = document.getElementById('process-selected');
+        const deleteSelected = document.getElementById('delete-selected');
 
         // Restore table state when page is loaded
         var savedState = localStorage.getItem('DataTables_jobsTable');
         if (savedState) {
             jobsTable.state.load();
         }
-
-        var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'))
-        var dropdownList = dropdownElementList.map(function (dropdownToggleEl) {
-            return new bootstrap.Dropdown(dropdownToggleEl)
-        })
     });
 });

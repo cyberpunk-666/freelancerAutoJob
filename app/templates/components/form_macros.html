@@ -46,11 +46,17 @@
                 <option value="">Loading...</option>
             </select>
 
+        {% elif field.type == 'textarea' %}
+            <textarea class="form-control bg-dark text-light border-secondary" 
+                id="{{ field.key }}" name="{{ field.key }}" 
+                rows="{{ field.rows|default(4) }}"
+                placeholder="Enter {{ field.name|lower }}">{{ user_value|default(field.default, true) }}</textarea>
+
         {% else %}
             <input type="text" class="form-control bg-dark text-light border-secondary" 
-                   id="{{ field.key }}" name="{{ field.key }}" 
-                   value="{{ user_value|default(field.default, true) }}"
-                   placeholder="Enter {{ field.name|lower }}">
+                id="{{ field.key }}" name="{{ field.key }}" 
+                value="{{ user_value|default(field.default, true) }}"
+                placeholder="Enter {{ field.name|lower }}">
         {% endif %}
 
         {% if field.description %}

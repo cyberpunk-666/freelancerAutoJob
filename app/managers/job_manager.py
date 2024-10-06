@@ -34,21 +34,22 @@ class JobManager:
 
             # Example table creation SQL
             create_table_query = """
-            CREATE TABLE IF NOT EXISTS job_details (
-                job_id VARCHAR(32) PRIMARY KEY, -- MD5 hash of job_title
-                job_title TEXT NOT NULL,
-                job_description TEXT,
-                budget VARCHAR(50),
-                email_date TIMESTAMP, -- When the job was received via email
-                gemini_results JSONB, -- JSON array/object of all Gemini results
-                job_fit INTEGER CHECK (job_fit >= 1 AND job_fit <= 5), -- Job fit score
-                status VARCHAR(50),
-                performance_metrics JSONB,
-                user_id INTEGER NOT NULL, -- User who posted the job
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                status_id INTEGER NOT NULL -- Status of the job
-            );
+                CREATE TABLE IF NOT EXISTS job_details (
+                    job_id VARCHAR(32) PRIMARY KEY, -- MD5 hash of job_title
+                    job_title TEXT NOT NULL,
+                    job_description TEXT,
+                    budget VARCHAR(50),
+                    email_date TIMESTAMP,
+                    gemini_results JSONB, -- JSON array/object of all Gemini results
+                    job_fit INTEGER CHECK (job_fit >= 0 AND job_fit <= 5), -- Job fit score
+                    status VARCHAR(50),
+                    performance_metrics JSONB,
+                    user_id INTEGER NOT NULL, -- User associated the job
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    status_id INTEGER NOT NULL, -- Status of the job
+                    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users (user_id)
+                );
 
             """
 
@@ -169,7 +170,7 @@ class JobManager:
         """Get all jobs for a user."""
         try:
             query = """
-            SELECT job_id, job_title, job_description, budget, email_date, gemini_results, status, performance_metrics, user_id, created_at, status_id
+            SELECT job_id, job_title, job_description, budget, email_date, gemini_results, status, performance_metrics, user_id, created_at, status_id, job_fit
             FROM job_details
             WHERE user_id = %s
             """
@@ -187,6 +188,7 @@ class JobManager:
                     "user_id": row[8],
                     "created_at": row[9],
                     "status_id": row[10],
+                    "job_fit": row[11],
                 }
                 for row in results
             ]
@@ -265,3 +267,21 @@ class JobManager:
         except Exception as e:
             self.logger.error(f"Error while fetching and storing jobs: {str(e)}", exc_info=True)
             return APIResponse(status="failure", message="Error while fetching and storing jobs")
+
+    def poll_updates_for_user(self, user_id, last_sync) -> APIResponse:
+        """Poll for updates for a user."""
+        try:
+            # Query jobs updated after last_sync
+            query = """
+            SELECT job_id, status, job_fit 
+                FROM job_details 
+                WHERE last_updated_at > %s and user_id = %s
+            """
+            results = self.db.fetch_all(query, (last_sync, user_id))
+            # Prepare job data for JSON response
+            job_data = [{'id': job[0], 'status': job[1], 'job_fit': job[2]} for job in results]
+
+            return APIResponse(status="success", message="Updates polled successfully", data=job_data)
+        except Exception as e:
+            self.logger.error(f"Failed to poll updates for user {user_id}", exc_info=True)
+            return APIResponse(status="failure", message="Failed to poll updates")

@@ -46,13 +46,21 @@ def login():
         login_response = user_manager.login(form.email.data, form.password.data)
         
         if login_response.status == "success":
-            # Retrieve usern
+            # Retrieve user
             user_response = user_manager.get_user(login_response.data["user_id"])
             
             if user_response.status == "success":
                 user = user_response.data["user"]
                 login_user(user)
-                flash(login_response.message, 'success')
+                
+                # Create user-specific queue
+                task_queue = TaskQueue()
+                queue_response = task_queue.create_user_queue(user.user_id)
+                if queue_response.status == "success":
+                    flash(login_response.message, 'success')
+                else:
+                    flash('Logged in successfully, but failed to create user queue.', 'warning')
+                
                 return redirect(url_for('jobs.jobs'))
             else:
                 flash(user_response.message, 'danger')

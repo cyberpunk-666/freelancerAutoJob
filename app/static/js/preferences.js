@@ -10,18 +10,18 @@ function savePreferences() {
         },
         body: JSON.stringify(preferences),
     })
-    .then(response => response.json())
-    .then(data => {
-        showConnectionStatus('Preferences saved successfully', true)      
-    })
-    .catch((error) => {
-        console.error('Error saving preferences:', error);
-        showConnectionStatus(`Error fetching jobs: ${error.message}`, false)
-    });
+        .then(response => response.json())
+        .then(data => {
+            showConnectionStatus('Preferences saved successfully', "success")
+        })
+        .catch((error) => {
+            console.error('Error saving preferences:', error);
+            showConnectionStatus(`Error fetching jobs: ${error.message}`, "error")
+        });
 }
 
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const saveBtn = document.getElementById('save-btn');
     if (saveBtn) {
         saveBtn.addEventListener('click', savePreferences);

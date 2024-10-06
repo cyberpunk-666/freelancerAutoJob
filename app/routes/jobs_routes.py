@@ -4,14 +4,14 @@ from app.forms.jobs_forms import CreateJobForm, UpdateJobForm
 from app.managers.job_manager import JobManager
 from app.db.postgresdb import PostgresDB
 from app.db.db_utils import get_db
-import markdown 
+import markdown
 import logging
 from flask import jsonify, request
 from app.services.email_processor import EmailProcessor
 from app.services.task_queue import TaskQueue
 from app.models.api_response import APIResponse
 from app.managers.role_manager import RoleManager
-from datetime import date
+from datetime import date, datetime
 
 job_bp = Blueprint('jobs', __name__)
 
@@ -29,6 +29,7 @@ def create_job():
         return redirect(url_for('jobs.jobs'))
     return render_template('create_job.html', form=form)
 
+
 @job_bp.route('/update_job/<int:job_id>', methods=['GET', 'POST'])
 @login_required
 def update_job(job_id):
@@ -40,11 +41,20 @@ def update_job(job_id):
         return redirect(url_for('jobs.jobs'))
     form = UpdateJobForm(obj=job)
     if form.validate_on_submit():
-        job_manager.update_job(job_id, {'title': form.title.data, 'description': form.description.data, 'budget': form.budget.data, 'status': form.status.data})
+        job_manager.update_job(
+            job_id,
+            {
+                'title': form.title.data,
+                'description': form.description.data,
+                'budget': form.budget.data,
+                'status': form.status.data,
+            },
+        )
         flash('Job updated successfully!', 'success')
         logging.info(f"Job updated: {job_id}")
         return redirect(url_for('jobs.jobs'))
     return render_template('update_job.html', form=form, job_id=job_id)
+
 
 @job_bp.route('/delete_job/<int:job_id>', methods=['POST'])
 @login_required
@@ -60,10 +70,18 @@ def delete_job(job_id):
     flash('Job deleted successfully!', 'success')
     return redirect(url_for('jobs.jobs'))
 
+
 @job_bp.route('/')
 @login_required
 def jobs():
     logging.info("Fetching all jobs")
+    
+    # Create or verify user-specific queue
+    task_queue = TaskQueue()
+    queue_response = task_queue.create_user_queue(current_user.user_id)
+    if queue_response.status != "success":
+        flash('Failed to create or verify user queue.', 'warning')
+    
     job_manager = JobManager()
     jobs_answer = job_manager.get_jobs_for_user(current_user.user_id)
     if jobs_answer.status == "success":
@@ -98,8 +116,12 @@ def job_detail(job_id):
     if 'generate_application_letter' in gemini_results:
         gemini_results['generate_application_letter'] = gemini_results['generate_application_letter']
         if 'introduction' in gemini_results['generate_application_letter']:
-            gemini_results['generate_application_letter']['introduction'] = markdown.markdown(gemini_results['generate_application_letter']['introduction'])
+            gemini_results['generate_application_letter']['introduction'] = markdown.markdown(
+                gemini_results['generate_application_letter']['introduction']
+            )
         if 'fit' in gemini_results['generate_application_letter']:
-            gemini_results['generate_application_letter']['fit'] = markdown.markdown(gemini_results['generate_application_letter']['fit'])
+            gemini_results['generate_application_letter']['fit'] = markdown.markdown(
+                gemini_results['generate_application_letter']['fit']
+            )
 
     return render_template('job/job_detail.html', job=job)

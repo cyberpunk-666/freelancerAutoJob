@@ -178,6 +178,15 @@ class JobApplicationProcessor:
     def is_budget_acceptable(self, analysis_summary, budget_info):
         """Determine if the budget is acceptable based on the estimated time in hours and rate."""
         try:
+            # Check if the analysis summary is empty
+            if not analysis_summary:
+                self.logger.error("Analysis summary is empty.")
+                return False
+
+            # Check if the budget information is empty
+            if not budget_info:
+                self.logger.error("Budget information is empty.")
+                return False
             # Directly extract the estimated total time in hours from the analysis summary
             estimated_hours = float(analysis_summary['total_estimated_time'].replace('hours', '').strip())
 

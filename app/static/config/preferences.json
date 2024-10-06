@@ -85,6 +85,14 @@
             "url":"/api/get_options/currency",
             "default":"usd",
             "category":"Currency"
+        },
+        {
+            "key":"profile_letter",
+            "name":"Profile letter",
+            "type":"textarea",
+            "default":"",
+            "category":"Profile",
+            "rows": 10
         }
     ]
 }

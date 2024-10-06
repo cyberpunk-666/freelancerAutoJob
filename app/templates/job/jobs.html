@@ -1,9 +1,10 @@
 {% extends "layout/layout.html" %} {% block title %}Job Dashboard{% endblock %} {% block content %}
 <div class="dropdown">
     <button class="btn btn-primary" id="fetch-jobs-btn">Manually Fetch Jobs</button>
+    <button class="btn btn-primary" id="start-polling">Start Polling</button>
+
     <div class="btn-group ml-2" id="action-menu">
         <button
-            disabled
             class="btn btn-secondary dropdown-toggle"
             type="button"
             id="dropdownMenuButton"
@@ -12,12 +13,19 @@
         >
             Actions
         </button>
+
         <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
             <li>
-                <a class="dropdown-item" href="#" id="process-selected">Process Selected Jobs</a>
+                <a class="dropdown-item disabled" href="#" id="process-selected">Process Selected Jobs</a>
             </li>
             <li>
-                <a class="dropdown-item" href="#" id="delete-selected">Delete Selected Jobs</a>
+                <a class="dropdown-item disabled" href="#" id="delete-selected">Delete Selected Jobs</a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="#" id="process-all-unprocessed">Process All Unprocessed</a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="#" id="delete-old-jobs">Delete Old Jobs</a>
             </li>
         </ul>
     </div>
@@ -49,7 +57,7 @@
             </td>
             <td>{{ job["budget"] }}</td>
             <td>{{ job['created_at'] | datetime('%Y-%m-%d %H:%M') }}</td>
-            <td>{{ job["fit"] }}</td>
+            <td>{{ job["job_fit"] }}</td>
             <td class="job-status" data-status="{{ job['status'] }}">{{ job['status'] }}</td>
         </tr>
         {% endfor %}
