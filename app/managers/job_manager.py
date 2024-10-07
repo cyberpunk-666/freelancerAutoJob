@@ -170,7 +170,7 @@ class JobManager:
         """Get all jobs for a user."""
         try:
             query = """
-            SELECT job_id, job_title, job_description, budget, email_date, gemini_results, status, performance_metrics, user_id, created_at, status_id, job_fit
+            SELECT job_id, job_title, job_description, budget, email_date, gemini_results, status, performance_metrics, user_id, created_at, status_id, job_fit, last_updated_at
             FROM job_details
             WHERE user_id = %s
             """
@@ -189,6 +189,7 @@ class JobManager:
                     "created_at": row[9],
                     "status_id": row[10],
                     "job_fit": row[11],
+                    "last_updated_at": row[12],
                 }
                 for row in results
             ]
@@ -279,7 +280,7 @@ class JobManager:
             """
             results = self.db.fetch_all(query, (last_sync, user_id))
             # Prepare job data for JSON response
-            job_data = [{'id': job[0], 'status': job[1], 'job_fit': job[2]} for job in results]
+            job_data = [{'job_id': job[0], 'status': job[1], 'job_fit': job[2]} for job in results]
 
             return APIResponse(status="success", message="Updates polled successfully", data=job_data)
         except Exception as e:

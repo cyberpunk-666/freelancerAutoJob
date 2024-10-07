@@ -16,5 +16,14 @@
     },
     "editor.formatOnSave": true,
     "prettier.singleQuote": true,
-    "prettier.trailingComma": "all"      
+    "prettier.trailingComma": "all",
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "./tests",
+        "-p",
+        "test_*.py"
+    ],
+    "python.testing.pytestEnabled": false,
+    "python.testing.unittestEnabled": true
 }

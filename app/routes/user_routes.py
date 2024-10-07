@@ -15,12 +15,14 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 from app.managers.user_preferences_manager import UserPreferencesManager
+from app.services.task_queue import TaskQueue
 
 csrf = CSRFProtect()
 limiter = Limiter(key_func=get_remote_address)
 
 user_bp = Blueprint('user', __name__)
 user_api_bp = Blueprint('user_api', __name__)
+
 
 @user_bp.route('/signup', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
@@ -41,35 +43,25 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user_manager = UserManager()  # Initialize UserManager with the db instance
-        
+
         # Login attempt
         login_response = user_manager.login(form.email.data, form.password.data)
-        
+
         if login_response.status == "success":
             # Retrieve user
             user_response = user_manager.get_user(login_response.data["user_id"])
-            
+
             if user_response.status == "success":
                 user = user_response.data["user"]
                 login_user(user)
-                
-                # Create user-specific queue
-                task_queue = TaskQueue()
-                queue_response = task_queue.create_user_queue(user.user_id)
-                if queue_response.status == "success":
-                    flash(login_response.message, 'success')
-                else:
-                    flash('Logged in successfully, but failed to create user queue.', 'warning')
-                
+
                 return redirect(url_for('jobs.jobs'))
             else:
                 flash(user_response.message, 'danger')
         else:
             flash(login_response.message, 'danger')
-    
+
     return render_template('user/login.html', form=form)
-
-
 
 
 @user_bp.route('/logout')
@@ -77,6 +69,7 @@ def logout():
     logout_user()
     flash('You have been logged out.', 'success')
     return redirect(url_for('user.login'))
+
 
 @user_bp.route('/profile', methods=['GET'])
 @login_required
@@ -103,16 +96,16 @@ def profile_post():
         for field, errors in form.errors.items():
             for error in errors:
                 print(f"Field: {field}, Error: {error}")
-                
+
         flash('Please correct the errors in the form.', 'danger')
     else:
         user_manager = UserManager()
-        user_manager.update_user(current_user.user_id, data={
-            'email': form.email.data,
-            'gemini_api_key': form.gemini_api_key.data
-        })
+        user_manager.update_user(
+            current_user.user_id, data={'email': form.email.data, 'gemini_api_key': form.gemini_api_key.data}
+        )
         flash('Profile updated successfully!', 'success')
     return render_template('user/profile.html', form=form)
+
 
 @user_bp.route('/verify-email/<token>', methods=['GET'])
 @login_required
@@ -124,6 +117,7 @@ def verify_email(token):
     else:
         flash('Email verification failed. Please try again or contact support.', 'danger')
     return redirect(url_for('user.login'))
+
 
 @user_bp.route('/reset_password', methods=['GET', 'POST'])
 @login_required
@@ -137,6 +131,7 @@ def reset_password():
         else:
             flash('Password reset failed. Please try again.', 'danger')
     return render_template('user/reset_password.html', form=form)
+
 
 @user_bp.route('/google-login')
 def google_login():
@@ -159,7 +154,7 @@ def google_login():
     else:
         flash('Failed to get user info from Google.', 'danger')
         return redirect(url_for('user.login'))
-    
+
 
 @user_bp.route('/preferences', methods=['GET', 'POST'])
 @login_required
@@ -176,16 +171,16 @@ def preferences():
                 break  # Exit the loop if there's an error
         else:  # This else belongs to the for loop (it runs if the loop completes without a break)
             flash('Preferences updated successfully', 'success')
-        
+
         # Redirect to GET after POST (Post/Redirect/Get pattern)
         return redirect(url_for('user.preferences'))
 
     # Fetch user preferences (for both GET and after POST)
     get_preferences_response = user_preferences_manager.get_preferences(current_user.user_id)
     user_preferences = get_preferences_response.data if get_preferences_response.status == "success" else {}
-    
+
     preferences_by_category = user_preferences_manager.get_preferences_categories()
 
-    return render_template('user/preferences.html', 
-        preferences_by_category=preferences_by_category, 
-        user_preferences=user_preferences)
+    return render_template(
+        'user/preferences.html', preferences_by_category=preferences_by_category, user_preferences=user_preferences
+    )

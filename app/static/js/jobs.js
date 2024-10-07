@@ -11,7 +11,9 @@ document.addEventListener('DOMContentLoaded', function () {
         jobsTable = $('#jobsTable').DataTable({
             "order": [[3, "desc"]],
             "paging": true,
-            "lengthChange": false,
+            "lengthChange": true, // Allow users to change page length
+            "pageLength": 50, // Set default page size to 10
+            "lengthMenu": [10, 50, 100, 500], // Options for page size
             "autoWidth": false,
             "dom": 't<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
             "stateSave": true,
@@ -58,9 +60,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         jobsTable.on('select deselect', function (e, dt, type, cell, originalEvent) {
             const selectedRows = jobsTable.rows({ selected: true }).data().length;
-
-            // Enable/disable action links based on selection
-            $('#process-selected, #delete-selected').toggleClass('disabled', selectedRows === 0);
+            // Update any UI elements that depend on selection
+            updateSelectionDependentUI();
         });
         return jobsTable
     }
@@ -69,14 +70,26 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateJobsInDataTable(jobs) {
         for (let job of jobs) {
             // Find the row with matching job_id in the DataTable
-            const row = jobsTable.row(`#${job.job_id}`);
+            const rowIndex = jobsTable.row(`#${job.job_id}`).index();
 
-            if (row) {
-                // Update the row data, assuming columns: job_id, job_title, status, job_fit
-                row.data([job.job_id, job.job_title, job.status, job.job_fit]);
+            if (rowIndex !== undefined) {
+                // Get the current row data
+                let rowData = jobsTable.row(rowIndex).data();
+
+                // Update specific columns
+                rowData.status = job.status;
+                rowData.job_fit = job.job_fit;
+
+                // Update the row with the modified data
+                jobsTable.row(rowIndex).data(rowData);
             }
         }
+
+        // Redraw the table to reflect the changes
+        jobsTable.draw();
     }
+
+
     function fetchJobs() {
         showLoadingIcon()
         try {
@@ -122,16 +135,51 @@ document.addEventListener('DOMContentLoaded', function () {
     if (fetchJobsBtn) {
         fetchJobsBtn.addEventListener('click', fetchJobs);
     }
+    $('#select-all-unprocessed').on('click', function () {
+        // Deselect all rows first
+        jobsTable.rows().deselect();
+
+        jobsTable.rows(function (idx, data, node) {
+            return !data[6] || Object.keys(data[6]).length === 0;
+        }).every(function (rowIdx, tableLoop, rowLoop) {
+            $(this.node()).find('input[type="checkbox"]').prop('checked', true);
+            $(this.node()).addClass('selected');
+        });
+        jobsTable.draw();
+
+
+        // Update the DataTable to reflect the changes
+        //jobsTable.draw();
+
+        // Update any UI elements that depend on selection
+        updateSelectionDependentUI();
+    });
+
+    function getSelectedRows() {
+        return jobsTable.rows({ selected: true }).data();
+    }
+
+    function updateSelectionDependentUI() {
+        const selectedRows = jobsTable.rows({ selected: true }).count();
+
+        // Enable/disable action buttons based on selection
+        $('#process-selected, #delete-selected').toggleClass('disabled', selectedRows === 0);
+
+        // Update the "Select All" checkbox state
+        $('#select-all').prop('checked', selectedRows > 0 && selectedRows === jobsTable.rows().count());
+
+        // Update the "Select All Unprocessed" checkbox state
+        $('#select-all-unprocessed').prop('checked', selectedRows > 0 && selectedRows === jobsTable.rows().count());
+
+    }
 
     // Handle "Select All" checkbox
     $('#select-all').on('change', function () {
         var isChecked = this.checked;
         jobsTable.rows().nodes().to$().find('input[type="checkbox"]').prop('checked', isChecked);
         jobsTable.rows().select(isChecked);
-
-        // Update action buttons
-        var selectedRows = isChecked ? jobsTable.rows().count() : 0;
-        $('#process-selected, #delete-selected').toggleClass('disabled', selectedRows === 0);
+        // Update any UI elements that depend on selection
+        updateSelectionDependentUI();
     });
 
     $('#process-selected').on('click', async function (e) {
@@ -172,8 +220,6 @@ document.addEventListener('DOMContentLoaded', function () {
     $('#start-polling').on('click', function () {
         startPolling();
     });
-    // Initial state of buttons
-    $('#process-selected, #delete-selected').attr('disabled', true);
 
 
     function addTaskToQueue(taskType, taskData) {
@@ -219,7 +265,7 @@ document.addEventListener('DOMContentLoaded', function () {
             let statusMessage = "";
 
             if (queueResult.status === "success") {
-                const messageCount = queueResult.data.task_count;
+                const messageCount = queueResult.data.visible_count;
                 totalTasks += messageCount;
                 updateTaskCount(messageCount);
             } else {
@@ -286,7 +332,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initialize DataTable on document ready
     $(document).ready(function () {
         initializeDataTable();
-
+        // Update any UI elements that depend on selection
+        updateSelectionDependentUI();
         // Disable/enable action buttons based on selected rows
         const processSelected = document.getElementById('process-selected');
         const deleteSelected = document.getElementById('delete-selected');

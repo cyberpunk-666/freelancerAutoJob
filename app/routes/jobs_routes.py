@@ -75,13 +75,7 @@ def delete_job(job_id):
 @login_required
 def jobs():
     logging.info("Fetching all jobs")
-    
-    # Create or verify user-specific queue
-    task_queue = TaskQueue()
-    queue_response = task_queue.create_user_queue(current_user.user_id)
-    if queue_response.status != "success":
-        flash('Failed to create or verify user queue.', 'warning')
-    
+
     job_manager = JobManager()
     jobs_answer = job_manager.get_jobs_for_user(current_user.user_id)
     if jobs_answer.status == "success":
