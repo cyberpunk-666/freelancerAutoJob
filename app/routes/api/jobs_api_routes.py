@@ -94,6 +94,9 @@ def get_jobs_for_user():
     i = 0
     while f'columns[{i}][data]' in request.args:
         column_data = request.args.get(f'columns[{i}][data]')
+        if not column_data:
+            i += 1
+            continue
         column_searchable = request.args.get(f'columns[{i}][searchable]') == 'true'
         columns.append({'data': column_data})
         if column_searchable:

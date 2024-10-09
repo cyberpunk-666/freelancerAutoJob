@@ -189,3 +189,11 @@ body {
         transform: rotate(360deg);
     }
 }
+
+#resize_wrapper {
+    position: absolute;
+    top: 6em;
+    left: 1em;
+    right: 1em;
+    bottom: 1em;
+}

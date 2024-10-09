@@ -4,17 +4,16 @@ document.addEventListener('DOMContentLoaded', function () {
     let pollingTimeout = null;
     let emptyResponseCount = 0;
     const MAX_EMPTY_RESPONSES = 20; // Stop after 20 empty responses (adjust as needed)
-    const POLLING_INTERVAL = 1000; // 1 second interval
-
-    let currentPage = 0; // Track the current page for job fetching
+    const POLLING_INTERVAL = 3000; // 1 second interval
+    let updateScroll = false
     let isLoading = false; // Prevent multiple simultaneous requests
     const PAGE_SIZE = 50;  // Adjust based on desired number of jobs per load
 
     function initializeDataTable() {
         jobsTable = $('#jobsTable').DataTable({
-            "processing": true,  // Show processing indicator
-            "serverSide": true,   // Enable server-side processing
-            "ajax": {
+            processing: true,  // Show processing indicator
+            serverSide: true,   // Enable server-side processing
+            ajax: {
                 "url": "/api/jobs/jobs"
             },
             scrollResize: false,
@@ -25,27 +24,35 @@ document.addEventListener('DOMContentLoaded', function () {
             scroller: true,
             ordering: true,
             searching: true,
-            // "order": [[3, "desc"]],  // Default sorting by 'created_at' column
-            "autoWidth": false,
-            "stateSave": true,  // Save table state (sort, filters, etc.)
-            "stateDuration": -1,  // Save indefinitely
-            "stateSaveCallback": function (settings, data) {
+            order: [[3, "desc"]],  // Default sorting by 'created_at' column
+            autoWidth: false,
+            stateSave: true,  // Save table state (sort, filters, etc.)
+            stateDuration: -1,  // Save indefinitely
+            scrollResize: true,
+            stateSaveCallback: function (settings, data) {
                 sessionStorage.setItem('DataTables_' + settings.sInstance, JSON.stringify(data));
             },
-            "stateLoadCallback": function (settings) {
+            stateLoadCallback: function (settings) {
                 return JSON.parse(sessionStorage.getItem('DataTables_' + settings.sInstance));
             },
             select: {
                 style: 'multi',
-                selector: 'td:first-child'
+                selector: 'td:first-child input[type="checkbox"]'  // Use checkbox in the first column
             },
             rowId: "job_id",  // Use 'job_id' as the row ID
-            "columns": [
+            columns: [
                 {
                     "searchable": false,
                     "orderable": false,
-                    "data": "job_id",
-                    "visible": false  // Make this column invisible
+                    "className": 'select-checkbox',  // Add a class for styling
+                    "data": null,  // No data is needed for the checkbox column
+                    "defaultContent": '',  // Render a checkbox
+                    "render": function (data, type, row) {
+                        // Render the checkbox
+                        return '<input type="checkbox">';
+                    },
+                    "title": '<input type="checkbox" id="select-all">',  // Header checkbox for "Select All"
+                    "width": '30px'  // Set width for the checkbox column
                 },
                 {
                     "searchable": true,
@@ -53,14 +60,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     "data": "job_title",  // Job title from the API
                     "title": "Job Title",  // Table header
                     "render": function (data, type, row) {
-                        // truncate the job title if it's too long
                         if (data) {
                             data = data.length > 50 ? data.substring(0, 50) + '...' : data;
                         } else {
                             data = '';
                         }
                         if (type === 'display') {
-                            // Create a link for the job title
                             return `<a href="/jobs/${row.job_id}" target="_blank">${data}</a>`;
                         }
                         return data;
@@ -70,9 +75,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     "searchable": false,
                     "orderable": true,
                     "data": "budget",  // Budget from the API
-                    "title": "Budget",  // Table header
+                    "title": "Budget",
                     "render": function (data, type, row) {
-                        // Render budget, handle if it's empty
                         return data ? data : 'N/A';
                     }
                 },
@@ -82,7 +86,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     "data": "last_updated_at",  // Last updated at date from the API
                     "title": "Last Updated",
                     "render": function (data, type, row) {
-                        // Convert to readable date
                         return new Date(data).toLocaleString();
                     }
                 },
@@ -109,14 +112,31 @@ document.addEventListener('DOMContentLoaded', function () {
                     "data": "status",  // Job status from the API
                     "title": "Status",
                     "render": function (data, type, row) {
-                        // Render status, handle if it's empty
                         return data ? data : 'N/A';
                     }
                 }
             ]
         });
+        // Restore scroll after reload, ensuring it happens after table redraw
+        jobsTable.on('draw', function () {
+            if (updateScroll) {
+                $('div.dt-scroll-body').scrollTop(currentTop);
+                updateScroll = false
+            }
+        });
+        var scrollingContainer = $(jobsTable.table().node()).parent('div.dt-scroll-body');
+        scrollingContainer.on('scroll', function (evt) {
+            currentTop = $(this).scrollTop();
+        });
+        // Handle the "select all" checkbox in the header
+        $('#select-all').on('click', function () {
+            var rows = jobsTable.rows({ 'search': 'applied' }).nodes();
+            $('input[type="checkbox"]', rows).prop('checked', this.checked);
+        });
 
-        return jobsTable
+
+
+        return jobsTable;
     }
 
 
@@ -423,12 +443,19 @@ document.addEventListener('DOMContentLoaded', function () {
             stopPolling();
         }
     }
+    function pollJobsTable() {
+        updateScroll = true
+        jobsTable.ajax.reload(function () {
+            // Schedule the next poll only after processing is complete
+            pollingTimeout = setTimeout(pollJobsTable, POLLING_INTERVAL);
+        }, false);
+    }
 
     function startPolling() {
         if (!pollingTimeout) {
             emptyResponseCount = 0;
             showConnectionStatus("Polling...", "loading", 0);
-            pollEndpoints(); // Start polling immediately
+            pollJobsTable(); // Start polling immediately
         }
     }
     function stopPolling() {
@@ -449,7 +476,5 @@ document.addEventListener('DOMContentLoaded', function () {
     if (savedState) {
         jobsTable.state.load();
     }
-
-
 
 });
