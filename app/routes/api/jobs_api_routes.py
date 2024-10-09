@@ -20,10 +20,14 @@ jobs_api_bp = Blueprint('jobs_api', __name__)
 @login_required
 def get_jobs():
     job_manager = JobManager()
-    jobs = job_manager.get_jobs_for_user(current_user.user_id)
-    if jobs is None:
-        return jsonify({"error": "No jobs found for the user"}), 404
-    return jobs.to_dict()
+    # Get paging parameters from request arguments with defaults
+    page = request.args.get('page', default=1, type=int)
+    page_size = request.args.get('page_size', default=10, type=int)
+
+    # Fetch the paginated jobs
+    jobs_response = job_manager.get_jobs_for_user(current_user.user_id, page=page, page_size=page_size)
+
+    return jobs_response.to_dict()
 
 
 @jobs_api_bp.route('/freelancer_jobs', methods=['GET'])
@@ -67,3 +71,62 @@ def poll_updates():
 
     api_response = job_manager.poll_updates_for_user(current_user.user_id, last_sync_dt)
     return api_response.to_dict()
+
+
+@jobs_api_bp.route('/jobs', methods=['GET'])
+@login_required
+def get_jobs_for_user():
+    job_manager = JobManager()
+
+    # Get DataTables parameters
+    draw = request.args.get('draw', type=int)
+    start = request.args.get('start', type=int)
+    length = request.args.get('length', type=int)
+    search_value = request.args.get('search[value]', '')
+
+    # Get sorting information
+    order_column_index = request.args.get('order[0][column]', type=int)
+    order_direction = request.args.get('order[0][dir]', 'desc')  # Default to descending if not provided
+
+    # Dynamically get column information
+    columns = []
+    searchable_columns = []
+    i = 0
+    while f'columns[{i}][data]' in request.args:
+        column_data = request.args.get(f'columns[{i}][data]')
+        column_searchable = request.args.get(f'columns[{i}][searchable]') == 'true'
+        columns.append({'data': column_data})
+        if column_searchable:
+            searchable_columns.append(column_data)
+        i += 1
+
+    # Set default sort column if no order is specified
+    if order_column_index is None:
+        sort_column = 'created_at' if 'created_at' in [col['data'] for col in columns] else columns[0]['data']
+    else:
+        sort_column = columns[order_column_index]['data'] if order_column_index < len(columns) else 'created_at'
+
+    # Fetch jobs using the updated method
+    jobs_response = job_manager.get_jobs_for_user(
+        user_id=current_user.user_id,
+        start=start,
+        length=length,
+        sort_column=sort_column,
+        sort_order=order_direction.upper(),
+        search_value=search_value,
+        columns=columns,
+        searchable_columns=searchable_columns,
+    )
+
+    if jobs_response.status == "failure":
+        return jsonify({"error": jobs_response.message}), 404
+
+    # Prepare DataTables response format
+    response_data = {
+        "draw": draw,
+        "recordsTotal": jobs_response.data['recordsTotal'],
+        "recordsFiltered": jobs_response.data['recordsFiltered'],
+        "data": jobs_response.data['jobs'],
+    }
+
+    return jsonify(response_data)

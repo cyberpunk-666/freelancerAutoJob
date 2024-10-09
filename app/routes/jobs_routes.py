@@ -88,7 +88,7 @@ def jobs():
     return render_template('job/jobs.html', jobs=jobs)
 
 
-@job_bp.route('/job/<job_id>')
+@job_bp.route('/<job_id>')
 @login_required
 def job_detail(job_id):
     job_manager = JobManager()

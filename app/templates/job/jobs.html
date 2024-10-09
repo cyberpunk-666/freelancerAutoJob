@@ -1,7 +1,7 @@
 {% extends "layout/layout.html" %} {% block title %}Job Dashboard{% endblock %} {% block content %}
 <div class="dropdown">
     <button class="btn btn-primary" id="fetch-jobs-btn">Manually Fetch Jobs</button>
-    <button class="btn btn-primary" id="start-polling">Start Polling</button>
+    <button class="btn btn-success" id="start-polling">Start Polling</button>
 
     <div class="btn-group ml-2" id="action-menu">
         <button
@@ -30,42 +30,9 @@
         </ul>
     </div>
 </div>
-
-<table id="jobsTable" class="table table-dark table-striped">
-    <thead>
-        <tr>
-            <th>
-                <input type="checkbox" id="select-all" aria-label="Select all jobs" />
-            </th>
-            <th>Title</th>
-            <th>Budget</th>
-            <th>Created at</th>
-            <th>Updated at</th>
-            <th>Fit</th>
-            <th>Status</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for job in jobs %}
-        <tr>
-            <td>
-                <input type="checkbox" class="job-checkbox" data-job-id="{{ job['job_id'] }}" aria-label="Select job" />
-            </td>
-            <td>
-                <a href="{{ url_for('jobs.job_detail', job_id=job['job_id']) }}" class="text-info">
-                    {{ job["job_title"] | truncate_title(80)}}
-                </a>
-            </td>
-            <td>{{ job["budget"] }}</td>
-            <td>{{ job['created_at'] | datetime('%Y-%m-%d %H:%M') }}</td>
-            <td>{{ job['last_updated_at'] | datetime('%Y-%m-%d %H:%M') }}</td>
-            <td>{{ job["job_fit"] }}</td>
-            <td class="job-status" data-status="{{ job['status'] }}">{{ job['status'] }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
+<div>
+    <table id="jobsTable" class="table table-dark table-striped"></table>
+</div>
 <script src="{{ url_for('static', filename='js/jobs.js') }}"></script>
 
 {% endblock %}

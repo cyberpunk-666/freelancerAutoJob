@@ -2,6 +2,7 @@ import hashlib
 import logging
 from datetime import datetime, timezone
 import os
+from typing import Dict, List
 
 from flask_login import current_user
 import requests
@@ -166,35 +167,86 @@ class JobManager:
             self.logger.error(f"Failed to retrieve job applications for user {user_id}", exc_info=True)
             return APIResponse(status="failure", message="Failed to retrieve user job applications")
 
-    def get_jobs_for_user(self, user_id) -> APIResponse:
-        """Get all jobs for a user."""
+    def get_jobs_for_user(
+        self,
+        user_id,
+        start: int = 0,
+        length: int = 10,
+        sort_column: str = 'created_at',
+        sort_order: str = 'DESC',
+        search_value: str = None,
+        columns: List[Dict[str, str]] = None,
+        searchable_columns: List[str] = None,
+    ) -> APIResponse:
+        """Get jobs for a user with start and length parameters for pagination."""
         try:
-            query = """
-            SELECT job_id, job_title, job_description, budget, email_date, gemini_results, status, performance_metrics, user_id, created_at, status_id, job_fit, last_updated_at
+            if not columns:
+                columns = [{'data': 'job_id'}]  # Fallback to at least select job_id
+
+            # Validate sort_column and sort_order to avoid SQL injection
+            valid_columns = [col['data'] for col in columns]
+            if sort_column not in valid_columns:
+                sort_column = 'created_at' if 'created_at' in valid_columns else valid_columns[0]
+            if sort_order not in ['ASC', 'DESC']:
+                sort_order = 'DESC'
+
+            # Construct SELECT part of the query
+            select_columns = ', '.join(valid_columns)
+
+            # Base query
+            query = f"""
+            SELECT {select_columns}
             FROM job_details
             WHERE user_id = %s
             """
-            results = self.db.fetch_all(query, (user_id,))
-            jobs = [
-                {
-                    "job_id": row[0],
-                    "job_title": row[1],
-                    "job_description": row[2],
-                    "budget": row[3],
-                    "email_date": row[4],
-                    "gemini_results": row[5],
-                    "status": row[6],
-                    "performance_metrics": row[7],
-                    "user_id": row[8],
-                    "created_at": row[9],
-                    "status_id": row[10],
-                    "job_fit": row[11],
-                    "last_updated_at": row[12],
-                }
-                for row in results
-            ]
-            self.logger.info(f"Retrieved {len(jobs)} jobs for user {user_id}")
-            return APIResponse(status="success", message="User jobs retrieved successfully", data=jobs)
+            query_params = [user_id]
+
+            # Add search functionality if search_value is provided
+            if search_value and searchable_columns:
+                search_conditions = []
+                for column in searchable_columns:
+                    if column in valid_columns:
+                        search_conditions.append(f"{column} LIKE %s")
+                        query_params.append(f"%{search_value}%")
+                if search_conditions:
+                    query += " AND (" + " OR ".join(search_conditions) + ")"
+
+            # Add sorting
+            query += f" ORDER BY {sort_column} {sort_order}"
+
+            # Add pagination
+            query += " LIMIT %s OFFSET %s"
+            query_params.extend([length, start])
+
+            # Execute the query
+
+            # Query to get total jobs (without pagination and search)
+            total_jobs = self.db.fetch_one("SELECT COUNT(*) FROM job_details WHERE user_id = %s", (user_id,))[0]
+
+            # Query to get filtered jobs count (with search, without pagination)
+            filtered_query = query.split(' LIMIT ')[0]
+            filtered_params = query_params[:-2]  # Remove LIMIT and OFFSET parameters
+            filtered_jobs = self.db.fetch_one(
+                f"SELECT COUNT(*) FROM ({filtered_query}) AS filtered_jobs", tuple(filtered_params)
+            )[0]
+            results = self.db.fetch_all(query, tuple(query_params))
+            # Construct jobs list based on the columns provided
+            jobs = []
+            for row in results:
+                job = {}
+                for i, column in enumerate(valid_columns):
+                    job[column] = row[i]
+                jobs.append(job)
+
+            data = {
+                "jobs": jobs,
+                "recordsTotal": total_jobs,
+                "recordsFiltered": filtered_jobs,
+            }
+
+            self.logger.info(f"Retrieved {len(jobs)} jobs for user {user_id} starting at {start} with length {length}")
+            return APIResponse(status="success", message="User jobs retrieved successfully", data=data)
+
         except Exception as e:
             self.logger.error(f"Failed to retrieve jobs for user {user_id}", exc_info=True)
             return APIResponse(status="failure", message="Failed to retrieve user jobs")

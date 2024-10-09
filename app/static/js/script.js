@@ -58,8 +58,10 @@ function showConnectionStatus(message, newStatus, task_count = null, timeout = n
 
         // Show the connection status only if there are tasks
         if (task_count > 0) {
+            taskCountSpan.style.display = 'block';
             connectionStatus.style.display = 'flex';
         } else {
+            taskCountSpan.style.display = 'none';
             connectionStatus.style.display = 'none';
         }
     }

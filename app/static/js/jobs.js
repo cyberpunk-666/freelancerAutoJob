@@ -1,69 +1,171 @@
 document.addEventListener('DOMContentLoaded', function () {
     const fetchJobsBtn = document.getElementById('fetch-jobs-btn');
     let jobsTable;
-    let pollingInterval = null;
+    let pollingTimeout = null;
     let emptyResponseCount = 0;
     const MAX_EMPTY_RESPONSES = 20; // Stop after 20 empty responses (adjust as needed)
     const POLLING_INTERVAL = 1000; // 1 second interval
 
+    let currentPage = 0; // Track the current page for job fetching
+    let isLoading = false; // Prevent multiple simultaneous requests
+    const PAGE_SIZE = 50;  // Adjust based on desired number of jobs per load
 
     function initializeDataTable() {
         jobsTable = $('#jobsTable').DataTable({
-            "order": [[3, "desc"]],
-            "paging": true,
-            "lengthChange": true, // Allow users to change page length
-            "pageLength": 50, // Set default page size to 10
-            "lengthMenu": [10, 50, 100, 500], // Options for page size
+            "processing": true,  // Show processing indicator
+            "serverSide": true,   // Enable server-side processing
+            "ajax": {
+                "url": "/api/jobs/jobs"
+            },
+            scrollResize: false,
+            scrollY: 300,
+            scrollCollapse: true,
+            paging: true,
+            deferRender: false,
+            scroller: true,
+            ordering: true,
+            searching: true,
+            // "order": [[3, "desc"]],  // Default sorting by 'created_at' column
             "autoWidth": false,
-            "dom": 't<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
-            "stateSave": true,
-            "stateDuration": -1,  // -1 means the state will be saved indefinitely
+            "stateSave": true,  // Save table state (sort, filters, etc.)
+            "stateDuration": -1,  // Save indefinitely
             "stateSaveCallback": function (settings, data) {
                 sessionStorage.setItem('DataTables_' + settings.sInstance, JSON.stringify(data));
             },
             "stateLoadCallback": function (settings) {
                 return JSON.parse(sessionStorage.getItem('DataTables_' + settings.sInstance));
             },
-            select: true,
             select: {
                 style: 'multi',
                 selector: 'td:first-child'
             },
-            columnDefs: [
+            rowId: "job_id",  // Use 'job_id' as the row ID
+            "columns": [
                 {
-                    orderable: false,
-                    className: 'select-checkbox',
-                    targets: 0
+                    "searchable": false,
+                    "orderable": false,
+                    "data": "job_id",
+                    "visible": false  // Make this column invisible
                 },
                 {
-                    targets: 2, // Budget column
-                    type: 'num',
-                    render: function (data, type, row) {
-                        if (type === 'sort') {
-                            var range = data.split('-');
-                            return parseFloat(range[0]) || 0;
+                    "searchable": true,
+                    "orderable": true,
+                    "data": "job_title",  // Job title from the API
+                    "title": "Job Title",  // Table header
+                    "render": function (data, type, row) {
+                        // truncate the job title if it's too long
+                        if (data) {
+                            data = data.length > 50 ? data.substring(0, 50) + '...' : data;
+                        } else {
+                            data = '';
+                        }
+                        if (type === 'display') {
+                            // Create a link for the job title
+                            return `<a href="/jobs/${row.job_id}" target="_blank">${data}</a>`;
                         }
                         return data;
                     }
                 },
                 {
-                    targets: 4, // Fit column
-                    render: function (data, type, row) {
-                        if (type === 'display') {
-                            return data != null && data != "None" ? data.toString() : '';
+                    "searchable": false,
+                    "orderable": true,
+                    "data": "budget",  // Budget from the API
+                    "title": "Budget",  // Table header
+                    "render": function (data, type, row) {
+                        // Render budget, handle if it's empty
+                        return data ? data : 'N/A';
+                    }
+                },
+                {
+                    "searchable": false,
+                    "orderable": true,
+                    "data": "last_updated_at",  // Last updated at date from the API
+                    "title": "Last Updated",
+                    "render": function (data, type, row) {
+                        // Convert to readable date
+                        return new Date(data).toLocaleString();
+                    }
+                },
+                {
+                    "searchable": false,
+                    "orderable": true,
+                    "data": "job_fit",  // Job fit from the API
+                    "title": "Job Fit",
+                    "render": function (data, type, row) {
+                        if (type === 'display' || type === 'filter') {
+                            if (data === 0 || data === '0') {
+                                return '0';
+                            } else if (data === null || data === '' || data === undefined) {
+                                return 'N/A';
+                            }
+                            return data;
                         }
                         return data;
+                    }
+                },
+                {
+                    "searchable": false,
+                    "orderable": true,
+                    "data": "status",  // Job status from the API
+                    "title": "Status",
+                    "render": function (data, type, row) {
+                        // Render status, handle if it's empty
+                        return data ? data : 'N/A';
                     }
                 }
             ]
         });
 
-        jobsTable.on('select deselect', function (e, dt, type, cell, originalEvent) {
-            const selectedRows = jobsTable.rows({ selected: true }).data().length;
-            // Update any UI elements that depend on selection
-            updateSelectionDependentUI();
-        });
         return jobsTable
+    }
+
+
+
+    // Fetch jobs with pagination (for infinite scrolling)
+    function fetchJobs(page) {
+        if (isLoading) return;
+        isLoading = true;
+        showLoadingIcon();
+
+        fetch(`/api/jobs/freelancer_jobs?page=${page}&page_size=${PAGE_SIZE}`)
+            .then(response => response.json())
+            .then(apiResponse => {
+                if (apiResponse.status !== 'success') {
+                    showConnectionStatus(apiResponse.message, "error");
+                    return;
+                }
+                const newJobs = apiResponse.data;
+                if (newJobs.length === 0) {
+                    showConnectionStatus('No more jobs to load', "info");
+                    stopPolling(); // If needed
+                    return;
+                }
+
+                // Append jobs to the DataTable
+                newJobs.forEach(job => {
+                    jobsTable.row.add({
+                        job_id: job.job_id,
+                        job_title: job.title,
+                        budget: job.budget,
+                        fit: job.job_fit,
+                        created_at: job.email_date,
+                        status: job.status
+                    });
+                });
+
+                // Redraw the table to show the new jobs
+                jobsTable.draw(false);  // 'false' keeps the current paging position
+                showConnectionStatus(`${newJobs.length} new jobs loaded`, "success");
+                isLoading = false;
+            })
+            .catch(error => {
+                console.error('Error fetching jobs:', error);
+                showConnectionStatus('Error fetching jobs', "error");
+                isLoading = false;
+            })
+            .finally(() => {
+                hideLoadingIcon();
+            });
     }
 
     // Function to update jobs in DataTable
@@ -215,12 +317,25 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log('Deleting jobs:', selectedJobIds);
         // Add your deletion logic here
     });
-
-    // start-polling
+    let isPolling = false
+    const pollButton = document.getElementById('start-polling');
     $('#start-polling').on('click', function () {
-        startPolling();
+        if (isPolling) {
+            // Stop polling
+            stopPolling();
+            pollButton.textContent = 'Start Polling';
+            pollButton.classList.remove('btn-danger');
+            pollButton.classList.add('btn-success');
+            isPolling = false;
+        } else {
+            // Start polling
+            startPolling();
+            pollButton.textContent = 'Stop Polling';
+            pollButton.classList.remove('btn-success');
+            pollButton.classList.add('btn-danger');
+            isPolling = true;
+        }
     });
-
 
     function addTaskToQueue(taskType, taskData) {
         const payload = {
@@ -247,7 +362,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     let lastSyncDate = new Date().toISOString(); // Start polling from current time
-    let pollingTimeout;
+
 
     async function pollEndpoints() {
         try {
@@ -310,38 +425,31 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function startPolling() {
-        if (!pollingInterval) {
+        if (!pollingTimeout) {
             emptyResponseCount = 0;
             showConnectionStatus("Polling...", "loading", 0);
             pollEndpoints(); // Start polling immediately
         }
     }
     function stopPolling() {
-        if (pollingInterval) {
-            clearInterval(pollingInterval);
+        if (pollingTimeout) {
+            clearInterval(pollingTimeout);
             hideConnectionStatus()
-            pollingInterval = null;
+            pollingTimeout = null;
             emptyResponseCount = 0;
             stickyStatus = null
         }
     }
+    initializeDataTable()
+    // Update any UI elements that depend on selection
+    updateSelectionDependentUI();
+
+    // Restore table state when page is loaded
+    var savedState = localStorage.getItem('DataTables_jobsTable');
+    if (savedState) {
+        jobsTable.state.load();
+    }
 
 
 
-
-    // Initialize DataTable on document ready
-    $(document).ready(function () {
-        initializeDataTable();
-        // Update any UI elements that depend on selection
-        updateSelectionDependentUI();
-        // Disable/enable action buttons based on selected rows
-        const processSelected = document.getElementById('process-selected');
-        const deleteSelected = document.getElementById('delete-selected');
-
-        // Restore table state when page is loaded
-        var savedState = localStorage.getItem('DataTables_jobsTable');
-        if (savedState) {
-            jobsTable.state.load();
-        }
-    });
 });
